@@ -1,0 +1,351 @@
+:root {
+  --line: #c9c9c9;
+  --ink: #1a1a1a;
+  --dim: #6b6b6b;
+  --bg: #f4f4f2;
+  --panel: #fff;
+  --accent: #2c5d7c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 14px/1.4 "Segoe UI", system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+h1 {
+  font-size: 16px;
+  margin: 0 12px 0 0;
+  font-weight: 600;
+}
+
+button, select, input {
+  font: inherit;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #fff;
+  color: var(--ink);
+}
+
+button { cursor: pointer; }
+button:hover:not(:disabled) { background: #ececec; }
+button:disabled { opacity: .45; cursor: default; }
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+button.primary:hover:not(:disabled) { background: #24506c; }
+button.danger { border-color: #a33; color: #a33; }
+
+.spacer { flex: 1; }
+.count { color: var(--dim); }
+a { color: var(--accent); }
+
+/* ---------- Board ---------- */
+
+.board {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  flex: 1 1 300px;
+  min-width: 280px;
+}
+
+.section h2 {
+  font-size: 13px;
+  margin: 0;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  background: #eceae6;
+  font-weight: 600;
+}
+
+.room {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  user-select: none;
+}
+
+.room:last-child { border-bottom: 0; }
+.room:hover { background: #f6f9fb; }
+.room.sel { background: #d6e7f2; box-shadow: inset 3px 0 0 var(--accent); }
+
+.room .no { font-weight: 600; width: 46px; }
+.room .cat { color: var(--dim); font-size: 12px; flex: 1; }
+
+.mk {
+  font-weight: 700;
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  min-width: 52px;
+  text-align: center;
+}
+
+.mk-vacant   { color: #b0b0b0; font-weight: 400; }
+.mk-F        { background: #eef1f4; color: #4a5b68; }
+.mk-P        { background: #fdf0d0; color: #7a5a12; }
+.mk-SP       { background: #f8d9c4; color: #8a3f12; }
+.mk-AF       { background: #d9efd9; color: #2c6130; }
+.mk-AN       { background: #f6d5d5; color: #8b2a2a; }
+.mk-turn     { background: #e2d8f0; color: #4d3a75; }
+
+/* ---------- Daily totals ---------- */
+
+.totals {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 12px 12px 0;
+}
+
+.totals-label { color: var(--dim); font-size: 12px; font-weight: 600; }
+.total { display: flex; align-items: center; gap: 6px; }
+/* AN and AN / AF are a different kind of number from the linen counts, so they
+   sit after a divider rather than reading as one continuous list. */
+.total.group-break { border-left: 1px solid var(--line); padding-left: 14px; }
+.total b { font-size: 18px; font-variant-numeric: tabular-nums; }
+
+/* ---------- Inventory units ---------- */
+
+.units { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+.unit {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 4px 8px;
+  min-width: 58px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  background: #fff;
+  line-height: 1.15;
+}
+.unit:hover { background: #f6f9fb; }
+.unit.sel { box-shadow: inset 0 0 0 2px var(--accent); background: #d6e7f2; }
+.unit .u-no { display: block; font-weight: 700; font-size: 14px; }
+.unit.named { min-width: 82px; }
+.unit .u-room { display: block; font-size: 11px; color: var(--dim); }
+
+/* In store, out, due today, overdue — the four states at a glance. */
+.u-in      { background: #fff; }
+.u-out     { background: #eef1f4; }
+.u-due     { background: #fdf0d0; border-color: #d8b45e; }
+.u-overdue { background: #f6d5d5; border-color: #c98a8a; }
+.u-due .u-room, .u-overdue .u-room { color: #6b4a12; }
+
+/* Per-room items reuse the cleaning board's room rows, so the two grids read
+   the same way. The status tints sit on top of that. */
+.roomcell.u-out     { background: #eef1f4; }
+.roomcell.u-due     { background: #fdf0d0; }
+.roomcell.u-overdue { background: #f6d5d5; }
+.roomcell.sel       { background: #d6e7f2; box-shadow: inset 3px 0 0 var(--accent); }
+
+/* Icons are inline SVG inheriting the text colour, so they stay monochrome on
+   the printed sheet and need no separate print rule. */
+.icon {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.22em;
+  margin-right: 6px;
+  flex: none;
+}
+.unit .icon { margin-right: 3px; }
+
+.icon-pick { display: flex; flex-wrap: wrap; gap: 3px; max-width: 260px; }
+.icon-pick button {
+  padding: 4px 5px;
+  line-height: 0;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.icon-pick button.on { border-color: var(--accent); background: #d6e7f2; }
+.icon-pick .icon { width: 17px; height: 17px; margin: 0; }
+
+/* ---------- Panels & dialogs ---------- */
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 12px;
+  margin: 0 12px 12px;
+}
+
+dialog {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 16px;
+  min-width: 320px;
+  max-width: 90vw;
+}
+dialog::backdrop { background: rgba(0, 0, 0, .35); }
+
+.field { display: block; margin-bottom: 10px; }
+.field span { display: block; font-size: 12px; color: var(--dim); margin-bottom: 3px; }
+.field input, .field select { width: 100%; }
+
+.row { display: flex; gap: 8px; align-items: center; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+
+.err {
+  background: #fdecec;
+  border: 1px solid #e0b4b4;
+  color: #8b2a2a;
+  padding: 8px 10px;
+  border-radius: 3px;
+  margin: 0 12px 12px;
+}
+
+table.stays { border-collapse: collapse; width: 100%; }
+table.stays th, table.stays td {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+}
+table.stays th { color: var(--dim); font-weight: 600; font-size: 12px; }
+
+/* ---------- Category editor ---------- */
+
+.cat-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 12px;
+  margin: 0 12px 12px;
+}
+
+.cat-head { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.cat-head .field { margin-bottom: 0; }
+
+.strip { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 2px; }
+
+.day {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 3px 5px;
+  min-width: 76px;
+  background: #fafafa;
+}
+.day .lbl { font-size: 10px; color: var(--dim); display: block; }
+.day select { width: 100%; padding: 2px 3px; font-size: 12px; }
+.day.fixed { background: #eceae6; text-align: center; }
+.day.fixed .val { font-weight: 700; font-size: 12px; }
+
+.sub { font-size: 12px; color: var(--dim); margin: 12px 0 2px; font-weight: 600; }
+.short-row { border-top: 1px solid #eee; padding-top: 8px; margin-top: 8px; }
+
+/* ---------- Print ---------- */
+
+.sheet { padding: 0 12px 24px; }
+
+table.list { border-collapse: collapse; width: 100%; table-layout: fixed; }
+
+table.list th, table.list td {
+  border: 1px solid #000;
+  padding: 2px 8px;
+  font-size: 16px;
+}
+
+/* Title and date live inside the table border rather than floating above it,
+   so the whole sheet is one enclosed block. */
+table.list tr.titlerow th {
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: .3px;
+  padding: 6px;
+  background: #fff;
+}
+
+table.list thead tr:not(.titlerow) th {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Rows are sized so 24 of them fill an A4 page rather than stopping halfway.
+   267mm of usable height, less the two header rows, over 24 rows. */
+table.list tbody td { height: 9.6mm; }
+
+/* Everything is centred, and the marker column is wide enough that "S & P" and
+   "AN / AF" sit comfortably rather than filling their cell edge to edge. */
+table.list th, table.list td { text-align: center; }
+
+table.list .c-room { width: 3cm; font-weight: 600; }
+table.list .c-mark { width: 2.8cm; font-weight: 700; white-space: nowrap; }
+table.list .c-note { width: auto; }
+
+table.list td.pad { border-color: #bbb; }
+
+/* Combined chart: three sections abreast, room and marker only. Notes are
+   dropped here — the writing space belongs on the per-floor sheets that
+   housekeeping actually carries. */
+table.list.master th, table.list.master td { font-size: 14px; padding: 2px 5px; }
+table.list.master .c-room { width: 3.2cm; }
+table.list.master .c-mark { width: 2.8cm; }
+table.list.master tbody td { height: 9.2mm; }
+table.list.master tr.titlerow th { font-size: 15px; }
+
+/* Collection sheet: room first so the walk follows the corridor order. */
+/* Larger and heavier on paper: at 16px body text a 1.15em icon is legible on
+   screen but muddy in print, and the sheet is read at arm's length. */
+table.list.collect .c-item .icon {
+  width: 1.5em;
+  height: 1.5em;
+  vertical-align: -0.35em;
+  stroke-width: 1.9;
+}
+
+table.list.collect .c-room { width: 2.6cm; }
+table.list.collect .c-item { width: 7.5cm; text-align: left; }
+table.list.collect .c-due  { width: 3.6cm; }
+table.list.collect .c-note { width: auto; }
+
+@page { size: A4 portrait; margin: 15mm; }
+
+@media print {
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  .sheet { break-before: page; padding: 0; }
+  .sheet:first-of-type { break-before: auto; }
+}

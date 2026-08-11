@@ -1,0 +1,78 @@
+{{define "board.html"}}<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<title>Cleanlist — {{.DateGr}}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <h1>Cleanlist</h1>
+  <label class="row">
+    <span style="color:var(--dim)">Ημερομηνία</span>
+    <input type="date" id="date" value="{{.Date}}">
+  </label>
+  <button id="btn-today">Σήμερα</button>
+  <span class="spacer"></span>
+  <span class="count" id="count">0 selected</span>
+  <button id="btn-in" class="primary" disabled>Check In</button>
+  <button id="btn-out" disabled>Check Out</button>
+  <button id="btn-clear" disabled>Clear</button>
+  <button id="btn-undo" {{if not .CanUndo}}disabled{{end}}>Undo</button>
+  <button id="btn-print" class="primary">Print</button>
+  <a href="/inventory">Inventory</a>
+  <a href="/categories">Categories</a>
+</header>
+
+<div id="err" class="err" style="display:none"></div>
+
+<div class="totals">
+  <span class="totals-label">Σύνολα {{.DateGr}}</span>
+  {{range $i, $t := .Totals}}
+  <span class="total{{if eq $i 3}} group-break{{end}}"><span class="mk {{$t.Class}}">{{$t.Marker}}</span><b>{{$t.Count}}</b></span>
+  {{end}}
+</div>
+
+<div class="board">
+{{range .Sections}}
+  <div class="section" data-section="{{.Key}}">
+    <h2>{{.Label}}</h2>
+    {{range .Cells}}
+    <div class="room" data-room="{{.Room}}">
+      <span class="no">{{.Room}}</span>
+      <span class="cat">{{.Category}}</span>
+      <span class="mk {{markerClass .Marker}}">{{.Marker}}</span>
+    </div>
+    {{end}}
+  </div>
+{{end}}
+</div>
+
+<div class="panel" id="detail" style="display:none">
+  <div class="sub">Stays — <span id="detail-room"></span></div>
+  <table class="stays">
+    <thead><tr><th>Category</th><th>Arrival</th><th>Departure</th><th></th></tr></thead>
+    <tbody id="detail-body"></tbody>
+  </table>
+</div>
+
+<dialog id="dlg-in">
+  <h3 style="margin:0 0 12px">Check In</h3>
+  <label class="field"><span>Category</span>
+    <select id="in-cat">
+      {{range .Categories}}<option value="{{.ID}}">{{.Label}}</option>{{end}}
+    </select>
+  </label>
+  <label class="field"><span>Arrival</span><input type="date" id="in-arr" value="{{.Today}}"></label>
+  <label class="field"><span>Departure</span><input type="date" id="in-dep" value="{{.Tomorrow}}"></label>
+  <div class="count" id="in-rooms"></div>
+  <div class="actions">
+    <button id="in-cancel">Cancel</button>
+    <button id="in-ok" class="primary">Check In</button>
+  </div>
+</dialog>
+
+<script src="/static/board.js"></script>
+</body>
+</html>{{end}}

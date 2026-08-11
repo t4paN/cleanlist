@@ -1,0 +1,101 @@
+{{define "print.html"}}<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<title>Cleanlist — {{.DateGr}}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="no-print">
+  <h1>Print preview</h1>
+  <span class="count">7 pages — full chart, then each section twice</span>
+  <span class="spacer"></span>
+  <button class="primary" onclick="window.print()">Print</button>
+  <button onclick="window.close()">Close</button>
+</header>
+
+<div class="no-print panel" style="color:var(--dim)">
+  In the print dialog open <b>More settings</b> and untick
+  <b>Headers and footers</b> — the URL and page numbers come from the browser,
+  not from Cleanlist, and cannot be removed from this end.
+</div>
+
+<!-- Combined chart: all three sections side by side, as in the original .odt -->
+<div class="sheet">
+  <table class="list master">
+    <!-- table-layout:fixed takes its widths from the first row, and that row is
+         the spanning title. Without an explicit colgroup the columns collapse to
+         equal thirds. -->
+    <colgroup>
+      <col class="c-room"><col class="c-mark">
+      <col class="c-room"><col class="c-mark">
+      <col class="c-room"><col class="c-mark">
+    </colgroup>
+    <thead>
+      <tr class="titlerow">
+        <th colspan="6">ΚΑΘΑΡΙΟΤΗΤΑ ΔΩΜΑΤΙΩΝ — {{.DateGr}}</th>
+      </tr>
+      <tr>
+        {{range .MasterHeads}}
+        <th class="c-room">Δωμάτιο</th><th class="c-mark"></th>
+        {{end}}
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Master}}
+      <tr>
+        {{range .Cells}}
+          {{if .}}
+          <td class="c-room">{{.Room}}</td>
+          <td class="c-mark">{{.Marker}}</td>
+          {{else}}
+          <td class="c-room pad">&nbsp;</td>
+          <td class="c-mark pad">&nbsp;</td>
+          {{end}}
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+
+<!-- Per-section sheets, each printed twice -->
+{{range .Sections}}
+<div class="sheet">
+  <table class="list">
+    <colgroup>
+      <col class="c-room"><col class="c-mark"><col class="c-note">
+    </colgroup>
+    <thead>
+      <tr class="titlerow">
+        <th colspan="3">{{.Label}} — {{$.DateGr}}</th>
+      </tr>
+      <tr>
+        <th class="c-room">Δωμάτιο</th>
+        <th class="c-mark"></th>
+        <th class="c-note">Σημειώσεις</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Cells}}
+      <tr>
+        <td class="c-room">{{.Room}}</td>
+        <td class="c-mark">{{.Marker}}</td>
+        <td class="c-note">&nbsp;</td>
+      </tr>
+      {{end}}
+      {{range .Blanks}}
+      <tr>
+        <td class="c-room">&nbsp;</td>
+        <td class="c-mark">&nbsp;</td>
+        <td class="c-note">&nbsp;</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+</body>
+</html>{{end}}

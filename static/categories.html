@@ -1,0 +1,35 @@
+{{define "categories.html"}}<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<title>Cleanlist — Categories</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <h1>Categories</h1>
+  <a href="/">← Board</a>
+  <span class="spacer"></span>
+  <button id="btn-add">Add category</button>
+  <button id="btn-save" class="primary">Save</button>
+</header>
+
+<div id="err" class="err" style="display:none"></div>
+<div id="ok" class="panel" style="display:none;color:#2c6130">Saved.</div>
+
+<div class="panel" style="color:var(--dim)">
+  Each category carries its own rules. <b>Short stays</b> are listed by total
+  nights and govern that length completely. Any length not listed falls through
+  to the <b>repeating interval</b> below.
+</div>
+
+<div id="list"></div>
+
+<script>
+const CATEGORIES = {{.CategoriesJSON}};
+const MARKERS = {{.MarkersJSON}};
+</script>
+<script src="/static/categories.js"></script>
+</body>
+</html>{{end}}

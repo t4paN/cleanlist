@@ -1,0 +1,136 @@
+{{define "inventory.html"}}<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<title>Inventory — {{.DateGr}}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <h1>Inventory</h1>
+  <a href="/">← Board</a>
+  <label class="row">
+    <span style="color:var(--dim)">Ημερομηνία</span>
+    <input type="date" id="date" value="{{.Date}}">
+  </label>
+  <span class="spacer"></span>
+  <span class="count" id="count">0 selected</span>
+  <button id="btn-lend" class="primary" disabled>Lend</button>
+  <button id="btn-return" disabled>Return</button>
+  <button id="btn-clear" disabled>Clear</button>
+  <button id="btn-undo" {{if not .CanUndo}}disabled{{end}}>Undo</button>
+  <button id="btn-print" class="primary">Print collections</button>
+  <a href="#" id="btn-items">Items</a>
+</header>
+
+<div id="err" class="err" style="display:none"></div>
+
+<div class="panel">
+  <div class="sub">Για μάζεμα — {{.DateGr}}</div>
+  {{if .Collections}}
+  <table class="stays">
+    <thead><tr><th>Δωμάτιο</th><th>Είδος</th><th>Λήξη</th><th></th><th></th></tr></thead>
+    <tbody>
+      {{range .Collections}}
+      <tr>
+        <td><b>{{.Room}}</b></td>
+        <td>{{icon .ItemIcon}}{{.ItemLabel}}</td>
+        <td>{{.DueGr}}</td>
+        <td>{{if eq .Status "overdue"}}<span class="mk mk-AN">+{{.DaysLate}}</span>{{else}}<span class="mk mk-F">σήμερα</span>{{end}}</td>
+        <td><button class="ret" data-id="{{.ID}}">Returned</button></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <div style="color:var(--dim)">Τίποτα για μάζεμα.</div>
+  {{end}}
+</div>
+
+<!-- Named items: each is one physical object, so one chip each. -->
+<div class="panel">
+  <div class="row"><b>Αντικείμενα</b><span class="spacer"></span></div>
+  <div class="units">
+    {{range .NamedItems}}
+    <div class="unit named {{if .Room}}u-{{.Status}}{{else}}u-in{{end}}"
+         data-item="{{.ID}}" data-loan="{{.LoanID}}"
+         {{if .Room}}title="Δωμάτιο {{.Room}} — λήξη {{.DueGr}}"{{end}}>
+      <span class="u-no">{{icon .Icon}}{{.Label}}</span>
+      <span class="u-room">{{if .Room}}{{.Room}}{{else}}—{{end}}</span>
+    </div>
+    {{end}}
+  </div>
+</div>
+
+<!-- Per-room items: the room is the identity, so the grid mirrors the cleaning
+     board and clicking a room lends or returns that room's own object. -->
+{{range .RoomBoards}}
+<div class="panel">
+  <div class="row">
+    <b>{{icon .Icon}}{{.Label}}</b>
+    <span class="count">{{.RuleLabel}}{{if eq .ReturnRule "days"}} ({{.ReturnDays}}){{end}}</span>
+    <span class="spacer"></span>
+    <span class="count">{{.OutCount}} out</span>
+  </div>
+  {{$item := .ID}}
+  <div class="board">
+    {{range .Sections}}
+    <div class="section">
+      <h2>{{.Label}}</h2>
+      {{range .Cells}}
+      <div class="room roomcell {{if .Status}}u-{{.Status}}{{end}}"
+           data-item="{{$item}}" data-room="{{.Room}}" data-loan="{{.LoanID}}">
+        <span class="no">{{.Room}}</span>
+        <span class="cat">{{.DueGr}}</span>
+      </div>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+<dialog id="dlg-lend">
+  <h3 style="margin:0 0 12px">Lend</h3>
+  <div id="lend-roomfield">
+    <label class="field"><span>Δωμάτιο</span>
+      <select id="lend-room">
+        {{range .Rooms}}<option value="{{.}}">{{.}}</option>{{end}}
+      </select>
+    </label>
+  </div>
+  <label class="field"><span>Ημερομηνία</span><input type="date" id="lend-on" value="{{.Date}}"></label>
+  <label class="field"><span>Λήξη (κενό = αυτόματα)</span><input type="date" id="lend-due"></label>
+  <label class="field"><span>Σημείωση</span><input type="text" id="lend-note"></label>
+  <div class="count" id="lend-what"></div>
+  <div class="actions">
+    <button id="lend-cancel">Cancel</button>
+    <button id="lend-ok" class="primary">Lend</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-items">
+  <h3 style="margin:0 0 12px">Items</h3>
+  <div class="count" style="margin-bottom:10px">
+    Per-room items belong to a room and are lent from the room grid. Everything
+    else is a single object with its number in the name.
+  </div>
+  <div id="items-list"></div>
+  <div class="actions">
+    <button id="items-add">Add item</button>
+    <span class="spacer"></span>
+    <button id="items-cancel">Close</button>
+    <button id="items-save" class="primary">Save</button>
+  </div>
+</dialog>
+
+<script>
+const ITEMS = {{.ItemsJSON}};
+const RETURN_RULES = {{.ReturnRulesJSON}};
+const RULE_LABELS = {{.RuleLabelsJSON}};
+const ICONS = {{.IconsJSON}};
+</script>
+<script src="/static/inventory.js"></script>
+</body>
+</html>{{end}}

@@ -1,0 +1,17 @@
+# Build artifacts. Reproducible from source; 11MB each, so they stay out of
+# history. The .exe that goes to the reception PC is built fresh per release:
+#   GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/cleanlist.exe .
+dist/*.exe
+dist/cleanlist-linux
+cleanlist
+cleanlist.exe
+
+# Live data. Written next to the executable at runtime. Never commit this —
+# it is real occupancy data for a working hotel.
+cleanlist-data.json
+cleanlist-data.json.tmp
+backups/
+
+# Print verification output (see CLAUDE.md, "Verifying print output")
+preview.pdf
+*.png

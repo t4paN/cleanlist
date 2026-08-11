@@ -1,0 +1,58 @@
+{{define "collect.html"}}<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<title>Μάζεμα — {{.DateGr}}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="no-print">
+  <h1>Collection sheet</h1>
+  <span class="spacer"></span>
+  <button class="primary" onclick="window.print()">Print</button>
+  <button onclick="window.close()">Close</button>
+</header>
+
+<div class="no-print panel" style="color:var(--dim)">
+  In the print dialog open <b>More settings</b> and untick
+  <b>Headers and footers</b>.
+</div>
+
+<div class="sheet">
+  <table class="list collect">
+    <colgroup>
+      <col class="c-room"><col class="c-item"><col class="c-due"><col class="c-note">
+    </colgroup>
+    <thead>
+      <tr class="titlerow"><th colspan="4">ΜΑΖΕΜΑ ΑΝΤΙΚΕΙΜΕΝΩΝ — {{.DateGr}}</th></tr>
+      <tr>
+        <th class="c-room">Δωμάτιο</th>
+        <th class="c-item">Είδος</th>
+        <th class="c-due">Λήξη</th>
+        <th class="c-note">✓</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Items}}
+      <tr>
+        <td class="c-room">{{.Room}}</td>
+        <td class="c-item">{{icon .ItemIcon}}{{.ItemLabel}}</td>
+        <td class="c-due">{{if eq .Status "overdue"}}{{.DueGr}} (+{{.DaysLate}}){{else}}{{.DueGr}}{{end}}</td>
+        <td class="c-note">&nbsp;</td>
+      </tr>
+      {{end}}
+      {{range .Blanks}}
+      <tr>
+        <td class="c-room">&nbsp;</td>
+        <td class="c-item">&nbsp;</td>
+        <td class="c-due">&nbsp;</td>
+        <td class="c-note">&nbsp;</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>{{end}}

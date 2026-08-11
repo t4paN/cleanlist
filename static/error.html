@@ -1,0 +1,23 @@
+{{define "error.html"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cleanlist — data problem</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header><h1>Cleanlist</h1></header>
+<div class="err" style="margin-top:12px">
+  <b>The saved data could not be read.</b><br>{{.Message}}
+</div>
+<div class="panel">
+  <p>Cleanlist has <b>not</b> started with an empty board on purpose — that would
+  look like every room is vacant, and the mistake might not be noticed until
+  housekeeping was already out.</p>
+  <p>Daily backups are kept here:</p>
+  <p><code>{{.Backups}}</code></p>
+  <p>Copy the most recent one over <code>cleanlist-data.json</code>, then start
+  Cleanlist again.</p>
+</div>
+</body>
+</html>{{end}}
