@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # No cgo, ever. It is what keeps the Windows cross-compile working from a
+  # Linux machine with no extra tooling (invariant 2 in CLAUDE.md).
+  CGO_ENABLED: "0"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          # Nothing to cache: the module has no dependencies and is meant to
+          # stay that way. See the guard below.
+          cache: false
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::These files are not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Stdlib only
+        # Invariant 2: no third-party modules, no cgo. A dependency creeping in
+        # is how the clean cross-compile breaks, and it breaks quietly.
+        run: |
+          if grep -qE '^[[:space:]]*require' go.mod; then
+            echo "::error::go.mod has grown a dependency — see invariant 2 in CLAUDE.md"
+            exit 1
+          fi
+          if [ -f go.sum ]; then
+            echo "::error::go.sum exists — dependencies crept in"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./... -v
+
+      - name: DST guard actually ran
+        # TestDSTBoundaries skips itself when tzdata is unavailable, and a skip
+        # is indistinguishable from a pass in the summary. This is the single
+        # most important correctness test in the codebase — the one standing
+        # between the hotel and every service interval shifting by a day twice a
+        # year — so a silent skip has to be a hard failure.
+        run: |
+          out=$(go test -run 'TestDSTBoundaries' -v . 2>&1) || { echo "$out"; exit 1; }
+          echo "$out"
+          if echo "$out" | grep -q -- '--- SKIP: TestDSTBoundaries'; then
+            echo "::error::TestDSTBoundaries skipped — tzdata missing from the test binary."
+            echo "::error::main.go must keep its blank _ \"time/tzdata\" import."
+            exit 1
+          fi
+          if ! echo "$out" | grep -q -- '--- PASS: TestDSTBoundaries'; then
+            echo "::error::TestDSTBoundaries did not report a pass."
+            exit 1
+          fi
+
+  build:
+    name: Build
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Build Windows binary
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: go build -ldflags="-s -w" -o dist/cleanlist.exe .
+
+      - name: Build Linux binary
+        env:
+          GOOS: linux
+          GOARCH: amd64
+        run: go build -ldflags="-s -w" -o dist/cleanlist-linux .
+
+      - name: Report sizes
+        run: ls -lh dist/ && file dist/*
+
+      - name: Upload binaries
+        # Grab these from the run summary instead of building locally. For a
+        # tagged release the same binaries are attached to the release itself.
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleanlist-binaries
+          path: dist/
+          retention-days: 30
+
+  print:
+    name: Print layout
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Install weasyprint
+        # Renders HTML+CSS to PDF. Close to Chromium's print engine but not
+        # identical — good enough to catch page counts, column widths and page
+        # breaks. Final say still belongs to the hotel's actual printer.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b fonts-dejavu-core
+          pip install --quiet weasyprint
+
+      - name: Build Linux binary
+        run: go build -o dist/cleanlist-linux .
+
+      - name: Render and check the sheets
+        run: python3 ci/verify-print.py dist/cleanlist-linux --out out
+
+      - name: Upload rendered sheets
+        # Download these to measure the layout by eye. This is the only way to
+        # check print output without a Windows box — invariant 3 says reading
+        # the CSS is not verification.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: printed-sheets-pdf
+          path: out/
+          retention-days: 30

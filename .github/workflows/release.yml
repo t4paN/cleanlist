@@ -1,0 +1,152 @@
+name: Release
+
+# Tag a commit and the binaries appear on the releases page:
+#
+#     git tag -a v1.0.0 -m "First release"
+#     git push origin v1.0.0
+#
+# This is the replacement for carrying a USB stick to the reception PC. Email
+# providers block .exe attachments even inside a zip; a release download link
+# does not have that problem.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build a release from"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CGO_ENABLED: "0"
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      # No green, no ship. A release is what ends up on the reception PC, so it
+      # re-runs the suite rather than trusting that CI passed on the branch.
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./... -v
+
+      - name: DST guard actually ran
+        run: |
+          out=$(go test -run 'TestDSTBoundaries' -v . 2>&1) || { echo "$out"; exit 1; }
+          if ! echo "$out" | grep -q -- '--- PASS: TestDSTBoundaries'; then
+            echo "::error::TestDSTBoundaries did not pass — refusing to release."
+            echo "$out"
+            exit 1
+          fi
+
+      - name: Install weasyprint
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b fonts-dejavu-core
+          pip install --quiet weasyprint
+
+      - name: Build Linux binary
+        env:
+          GOOS: linux
+          GOARCH: amd64
+        run: go build -ldflags="-s -w" -o dist/cleanlist-linux .
+
+      - name: Verify print layout
+        # A release that prints five pages instead of seven is worse than no
+        # release. The rendered sheets ship with it as a reference.
+        run: python3 ci/verify-print.py dist/cleanlist-linux --out out
+
+      - name: Build Windows binary
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: go build -ldflags="-s -w" -o dist/cleanlist.exe .
+
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum cleanlist.exe cleanlist-linux > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Release notes
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          {
+            echo "## Cleanlist $TAG"
+            echo
+            echo "### Installing"
+            echo
+            echo 'Download **`cleanlist.exe`** below and put it in a folder of its own on'
+            echo 'the reception PC — it writes its data alongside itself. Double-click it.'
+            echo 'A console window opens and stays open; **that window is the app running,**'
+            echo '**closing it stops Cleanlist.** The browser opens automatically.'
+            echo
+            echo 'Read the address from the console window. It is usually'
+            echo '`http://127.0.0.1:8080` but not always — Windows reserves blocks of ports'
+            echo 'at boot, so Cleanlist walks a list until it finds a free one and prints'
+            echo 'the address it got.'
+            echo
+            echo '**First launch shows two one-time prompts, both expected:** SmartScreen'
+            echo '("Windows protected your PC" → *More info* → *Run anyway*), because the'
+            echo 'binary is unsigned; and possibly Windows Firewall, which is safe to'
+            echo 'decline — Cleanlist binds to `127.0.0.1` only and is not reachable from'
+            echo 'the network.'
+            echo
+            echo "### Upgrading"
+            echo
+            echo 'Replace `cleanlist.exe` and keep everything else. `cleanlist-data.json`'
+            echo 'sits next to it and survives the swap, so occupancy and categories carry'
+            echo 'over. Copy that file aside first anyway — it is the only copy of live'
+            echo 'data apart from the daily backups in `backups/`.'
+            echo
+            echo '> If a release ever needs a data migration it will say so here, in this'
+            echo '> section, in plain terms. No release will migrate quietly.'
+            echo
+            echo "### Checksums"
+            echo
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+            echo
+            echo "### Also attached"
+            echo
+            echo '- `cleanlist-linux` — Linux build, for testing on a dev machine.'
+            echo '- `print-*.pdf` / `collection-*.pdf` — the sheets exactly as this build'
+            echo '  renders them, against sample occupancy. Reference for what changed.'
+            echo
+            echo "---"
+          } > notes.md
+          cat notes.md
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          gh release create "$TAG" \
+            --title "Cleanlist $TAG" \
+            --notes-file notes.md \
+            --generate-notes \
+            dist/cleanlist.exe \
+            dist/cleanlist-linux \
+            dist/SHA256SUMS.txt \
+            out/*.pdf
