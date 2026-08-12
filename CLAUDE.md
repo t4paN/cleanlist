@@ -246,6 +246,42 @@ Other invariants here:
 as nil from an older file, are seeded in `load`, and the upgraded shape is
 written straight back so the file on disk always matches what the app holds.
 
+## Icon sets
+
+The drawings in `icons.go` are the default. A hotel can upload its own PNGs
+from `/icons` and switch to them with `Settings.CustomIcons`.
+
+**Uploads live in an `icons/` directory beside the executable, not in
+`cleanlist-data.json`.** That placement is the point: the data file is the only
+copy of live occupancy, a corrupt one deliberately stops the app starting, and
+thirty daily backups would carry every uploaded picture forever. Out in its own
+directory a missing or broken picture falls back to the drawing and nobody loses
+a booking over it. Do not move icons into the data file.
+
+Three things hold the upload path together:
+
+- **`IconSlots()` is the allowlist**, fixed in code. A file is written under the
+  slot it was uploaded to, never under the name the browser sent, so there is no
+  traversal to defend against — `handleIconFile` reconstructs the path from the
+  same list. Adding a drawing to `iconSet` adds its slot automatically;
+  `keycardred` and `keycardblue` are slots with no item of their own and fall
+  back to the key drawing, which the board tints itself.
+- **PNG is checked by magic bytes, not by extension**, and capped at
+  `maxIconBytes`. Writes are temp-then-rename like the data file, so a
+  half-received upload is never what the board picks up.
+- **`iconMode` caches the mode and the file list** so `IconSVG` never reaches
+  back into the Store. Templates render *after* the store lock is released, and
+  a helper that took it again would deadlock the first time someone moved a
+  render call inside a `Read`. Call `refreshIconsFromStore` after anything that
+  changes either.
+
+The keycard badge is two different pictures under a custom set, so
+`/api/keycard` returns the rendered markup rather than letting the page work out
+which to draw. Same reasoning as the category preview — one renderer, not two
+that can drift apart.
+
+`sample-icons/` holds plain black squares for testing the switch end to end.
+
 ## Print output
 
 The cleaning sheet is eight pages: the keycard list once, the combined chart

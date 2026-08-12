@@ -186,13 +186,28 @@ document.querySelectorAll('.kc').forEach((el) => {
     e.stopPropagation();
     if (!document.body.classList.contains('kc-track')) return;
     try {
-      const { baked } = await post('/api/keycard', {
+      const { baked, icon } = await post('/api/keycard', {
         date: $('date').value,
         room: el.dataset.room,
       });
       el.classList.toggle('kc-done', baked);
+      // The badge is two different pictures under a custom icon set, and the
+      // server is the one that knows which. Markup comes from IconSVG.
+      if (icon) el.innerHTML = icon;
     } catch (err) { showErr(err.message); }
   });
 });
+
+// Icons are rendered server-side, so this one reloads rather than repainting.
+$('opt-icons').onchange = async (e) => {
+  const on = e.target.checked;
+  try {
+    await post('/api/settings', { custom_icons: on });
+    location.reload();
+  } catch (err) {
+    e.target.checked = !on;
+    showErr(err.message);
+  }
+};
 
 paint();

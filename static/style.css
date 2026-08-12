@@ -429,6 +429,45 @@ body:not(.kc-track) .kc {
   color: var(--dim);
 }
 
+/* ---------- Icon sets ---------- */
+
+/* One class covers both the drawn SVG and an uploaded PNG, so a custom set
+   drops in at the right size everywhere without touching another rule. */
+img.icon { object-fit: contain; }
+
+.iconlist { display: flex; flex-direction: column; }
+
+.iconrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.iconrow:last-child { border-bottom: 0; }
+.iconrow form { margin: 0; }
+.iconrow input[type=file] { max-width: 220px; }
+
+.iconprev {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--stripe);
+}
+.iconprev .icon {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  vertical-align: 0;
+}
+
+.iconname { flex: 1; }
+
 /* ---------- Print ---------- */
 
 .sheet { padding: 0 12px 24px; }

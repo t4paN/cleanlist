@@ -7,13 +7,17 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	// Windows ships no tzdata, and LoadLocation would fail there. Embedding it
@@ -97,6 +101,7 @@ func main() {
 		fatal("Cleanlist could not start: %v", err)
 	}
 	store = s
+	refreshIconsFromStore()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleBoard)
@@ -113,6 +118,12 @@ func main() {
 	mux.HandleFunc("/api/undo", jsonPost(apiUndo))
 	mux.HandleFunc("/api/keycard", jsonPost(apiKeycardToggle))
 	mux.HandleFunc("/api/settings", jsonPost(apiSettings))
+	// "/icons" is the editor and "/icons/" serves the files. Registering both
+	// is how ServeMux distinguishes an exact path from a subtree.
+	mux.HandleFunc("/icons", handleIconsPage)
+	mux.HandleFunc("/icons/", handleIconFile)
+	mux.HandleFunc("/api/icons/upload", handleIconUpload)
+	mux.HandleFunc("/api/icons/remove", handleIconRemove)
 	mux.HandleFunc("/api/categories", jsonPost(apiSaveCategories))
 	mux.HandleFunc("/api/preview", jsonPost(apiPreview))
 	mux.HandleFunc("/api/room", apiRoom)
@@ -272,6 +283,7 @@ func handleBoard(w http.ResponseWriter, r *http.Request) {
 		data["Totals"] = serviceTotals(st, d)
 		data["Keycards"] = len(KeycardsFor(st, d))
 		data["KeycardTracking"] = st.Settings != nil && st.Settings.KeycardTracking
+		data["CustomIcons"] = st.Settings != nil && st.Settings.CustomIcons
 	})
 	render(w, "board.html", data)
 }
@@ -477,27 +489,143 @@ func apiKeycardToggle(r *http.Request) (any, error) {
 	}); err != nil {
 		return nil, err
 	}
-	return map[string]any{"baked": baked}, nil
+	// The badge is two different pictures once a custom set is in use, so the
+	// server says what to draw rather than the page guessing. Same reasoning as
+	// the category preview: one renderer, not two that can disagree.
+	name := "keycardred"
+	if baked {
+		name = "keycardblue"
+	}
+	return map[string]any{"baked": baked, "icon": string(IconSVG(name))}, nil
 }
 
 func apiSettings(r *http.Request) (any, error) {
 	var req struct {
-		// A pointer so that an absent field leaves the setting alone rather
+		// Pointers so that an absent field leaves that setting alone rather
 		// than switching it off.
 		KeycardTracking *bool `json:"keycard_tracking"`
+		CustomIcons     *bool `json:"custom_icons"`
 	}
 	if err := decode(r, &req); err != nil {
 		return nil, err
 	}
-	return nil, store.MutateNoUndo(func(st *State) error {
+	if err := store.MutateNoUndo(func(st *State) error {
 		if st.Settings == nil {
 			st.Settings = defaultSettings()
 		}
 		if req.KeycardTracking != nil {
 			st.Settings.KeycardTracking = *req.KeycardTracking
 		}
+		if req.CustomIcons != nil {
+			st.Settings.CustomIcons = *req.CustomIcons
+		}
 		return nil
+	}); err != nil {
+		return nil, err
+	}
+	refreshIconsFromStore()
+	return nil, nil
+}
+
+// ---------- Icon sets ----------
+
+// refreshIconsFromStore re-reads the setting and rescans the directory. Kept
+// separate from RefreshIcons so the icon code never has to know about the Store.
+func refreshIconsFromStore() {
+	custom := false
+	store.Read(func(st *State) {
+		custom = st.Settings != nil && st.Settings.CustomIcons
 	})
+	RefreshIcons(custom)
+}
+
+type iconSlotView struct {
+	Icon
+	Have bool
+}
+
+func handleIconsPage(w http.ResponseWriter, r *http.Request) {
+	data := map[string]any{"Err": r.URL.Query().Get("err")}
+	store.Read(func(st *State) {
+		data["CustomIcons"] = st.Settings != nil && st.Settings.CustomIcons
+	})
+	have := CustomIconNames()
+	slots := []iconSlotView{}
+	for _, s := range IconSlots() {
+		slots = append(slots, iconSlotView{s, have[s.ID]})
+	}
+	data["Slots"] = slots
+	render(w, "icons.html", data)
+}
+
+// handleIconFile serves an uploaded picture. The path has to be exactly a known
+// slot plus .png — nothing derived from the request reaches the filesystem
+// otherwise, so there is no traversal to defend against.
+func handleIconFile(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimPrefix(r.URL.Path, "/icons/")
+	id := strings.TrimSuffix(name, ".png")
+	if id == name || !isIconSlot(id) {
+		http.NotFound(w, r)
+		return
+	}
+	// The board is re-rendered as soon as a new picture lands, so a cached copy
+	// would show the old one until someone thought to hard-refresh.
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFile(w, r, filepath.Join(iconsDir(), id+".png"))
+}
+
+func iconRedirect(w http.ResponseWriter, r *http.Request, msg string) {
+	u := "/icons"
+	if msg != "" {
+		u += "?err=" + url.QueryEscape(msg)
+	}
+	http.Redirect(w, r, u, http.StatusSeeOther)
+}
+
+// handleIconUpload takes a plain multipart form rather than JSON. It is the one
+// place in the app that moves a file, and a form post that lands back on the
+// page needs no JavaScript to work at all.
+func handleIconUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseMultipartForm(maxIconBytes); err != nil {
+		iconRedirect(w, r, "the upload was too large or malformed")
+		return
+	}
+	f, _, err := r.FormFile("file")
+	if err != nil {
+		iconRedirect(w, r, "choose a PNG file first")
+		return
+	}
+	defer f.Close()
+	// One byte past the limit, so an oversized file is reported as oversized
+	// rather than silently truncated to something that still looks like a PNG.
+	data, err := io.ReadAll(io.LimitReader(f, maxIconBytes+1))
+	if err != nil {
+		iconRedirect(w, r, "the file could not be read")
+		return
+	}
+	if err := SaveIcon(r.FormValue("slot"), data); err != nil {
+		iconRedirect(w, r, err.Error())
+		return
+	}
+	refreshIconsFromStore()
+	iconRedirect(w, r, "")
+}
+
+func handleIconRemove(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := RemoveIcon(r.FormValue("slot")); err != nil {
+		iconRedirect(w, r, err.Error())
+		return
+	}
+	refreshIconsFromStore()
+	iconRedirect(w, r, "")
 }
 
 func apiSaveCategories(r *http.Request) (any, error) {

@@ -166,6 +166,11 @@ type Settings struct {
 	// for reception to confirm against, so it defaults on and can be switched
 	// off by anyone who finds it noise.
 	KeycardTracking bool `json:"keycard_tracking"`
+
+	// CustomIcons switches the board and the sheets over to the pictures in the
+	// icons/ directory. Off is both the intended default and the zero value, so
+	// a file written by the previous build correctly keeps the drawings.
+	CustomIcons bool `json:"custom_icons"`
 }
 
 func defaultSettings() *Settings { return &Settings{KeycardTracking: true} }

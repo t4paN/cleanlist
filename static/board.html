@@ -39,6 +39,12 @@
           Double-click a keycard to mark it made. The printed sheet, crossed
           off by hand, is still the record — this is only a second pass.
         </p>
+        <div class="menu-sep"></div>
+        <label class="menu-toggle">
+          <input type="checkbox" id="opt-icons"{{if .CustomIcons}} checked{{end}}>
+          <span>Uploaded icons</span>
+        </label>
+        <a href="/icons">Manage icons…</a>
       </div>
     </div>
   </div>
@@ -72,7 +78,8 @@
         </span>
         {{if .Keycard}}
         <span class="kc{{if .Baked}} kc-done{{end}}" data-room="{{.Room}}"
-              title="Keycard needed — double-click when it is made">{{icon "key"}}</span>
+              title="Keycard needed — double-click when it is made"
+          >{{if .Baked}}{{icon "keycardblue"}}{{else}}{{icon "keycardred"}}{{end}}</span>
         {{end}}
         <span class="mk {{markerClass .Marker}}">{{.Marker}}</span>
       </div>

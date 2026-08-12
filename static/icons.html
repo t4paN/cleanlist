@@ -1,0 +1,61 @@
+{{define "icons.html"}}<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<title>Cleanlist — Icons</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <div class="bar wrap">
+    <h1>Icons</h1>
+    <span class="spacer"></span>
+    <a href="/">Board</a>
+  </div>
+</header>
+
+{{if .Err}}<div class="err wrap">{{.Err}}</div>{{end}}
+
+<div class="panel wrap">
+  <label class="menu-toggle" style="padding:0">
+    <input type="checkbox" id="opt-icons"{{if .CustomIcons}} checked{{end}}>
+    <span><b>Use uploaded icons</b> instead of the drawn ones</span>
+  </label>
+  <p class="menu-note" style="margin-left:0">
+    PNG, up to 512KB each. A picture is filed under the slot it was uploaded to
+    rather than under its own filename, and a slot with nothing in it falls back
+    to its drawing — so the switch is safe to flip at any time, and an icon you
+    have not replaced yet simply keeps the drawing.
+  </p>
+</div>
+
+<div class="panel wrap">
+  <div class="iconlist">
+    {{range .Slots}}
+    <div class="iconrow">
+      <span class="iconprev">
+        {{if .Have}}<img class="icon" src="/icons/{{.ID}}.png" alt="">{{else}}{{icon .ID}}{{end}}
+      </span>
+      <span class="iconname">{{.Name}}<span class="dim"> · {{.ID}}.png</span></span>
+      <form method="post" action="/api/icons/upload" enctype="multipart/form-data" class="row">
+        <input type="hidden" name="slot" value="{{.ID}}">
+        <input type="file" name="file" accept="image/png" required>
+        <button class="primary">Upload</button>
+      </form>
+      {{if .Have}}
+      <form method="post" action="/api/icons/remove">
+        <input type="hidden" name="slot" value="{{.ID}}">
+        <button class="danger">Remove</button>
+      </form>
+      {{else}}
+      <span class="dim">drawing</span>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+</div>
+
+<script src="/static/icons.js"></script>
+</body>
+</html>{{end}}

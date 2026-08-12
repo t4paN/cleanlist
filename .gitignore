@@ -12,6 +12,10 @@ cleanlist-data.json
 cleanlist-data.json.tmp
 backups/
 
+# Uploaded icon sets, written beside the executable at runtime. The committed
+# sample set lives in sample-icons/.
+icons/
+
 # Print verification output (see CLAUDE.md, "Verifying print output")
 preview.pdf
 *.png

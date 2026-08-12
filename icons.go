@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"html/template"
+	"os"
+	"path/filepath"
 	"sort"
+	"sync"
 )
 
 // Icons are inline SVG rather than emoji or an icon font.
@@ -39,10 +44,164 @@ var iconByID = func() map[string]Icon {
 	return m
 }()
 
+// ---------- Custom icon sets ----------
+//
+// A hotel can replace the drawn icons with pictures of its own. They live in an
+// icons/ directory beside the executable rather than inside
+// cleanlist-data.json.
+//
+// That placement is the whole point. The data file is the only copy of live
+// occupancy, a corrupt one deliberately stops the app starting, and thirty
+// daily backups would carry every uploaded picture forever. Out here a missing
+// or broken picture is just a missing picture: it falls back to the drawing and
+// nobody loses a booking over it.
+
+// keycardSlots are upload targets with no item of their own. They fall back to
+// the key drawing, which the board then tints red or blue itself — so leaving
+// them empty costs nothing.
+func keycardSlots() []Icon {
+	key := iconByID["key"].Path
+	return []Icon{
+		{"keycardred", "Keycard — to make", key},
+		{"keycardblue", "Keycard — made", key},
+	}
+}
+
+// IconSlots lists every name a custom icon may be uploaded under.
+//
+// Uploads are filed under a slot chosen from this list, never under the name
+// the browser sent. That is what makes a path traversal impossible rather than
+// merely unlikely, and it is why the list is fixed in code.
+func IconSlots() []Icon {
+	out := make([]Icon, 0, len(iconSet)+2)
+	out = append(out, iconSet...)
+	out = append(out, keycardSlots()...)
+	return out
+}
+
+func isIconSlot(id string) bool {
+	for _, s := range IconSlots() {
+		if s.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func lookupIcon(id string) (Icon, bool) {
+	if ic, ok := iconByID[id]; ok {
+		return ic, true
+	}
+	for _, s := range keycardSlots() {
+		if s.ID == id {
+			return s, true
+		}
+	}
+	return Icon{}, false
+}
+
+func iconsDir() string { return filepath.Join(dataDir(), "icons") }
+
+// iconMode caches everything the renderer needs.
+//
+// Templates execute after the Store's lock has been released, and a helper that
+// reached back into the Store would deadlock the first time anyone moved a
+// render call inside a Read. Its own small lock keeps that impossible.
+var iconMode struct {
+	mu     sync.RWMutex
+	custom bool
+	have   map[string]bool
+}
+
+// RefreshIcons rescans the directory and records whether custom icons are on.
+// Called at startup and after any upload, removal or settings change.
+func RefreshIcons(custom bool) {
+	have := map[string]bool{}
+	for _, s := range IconSlots() {
+		fi, err := os.Stat(filepath.Join(iconsDir(), s.ID+".png"))
+		if err == nil && fi.Mode().IsRegular() {
+			have[s.ID] = true
+		}
+	}
+	iconMode.mu.Lock()
+	iconMode.custom = custom
+	iconMode.have = have
+	iconMode.mu.Unlock()
+}
+
+// CustomIconNames reports which slots currently have a file, for the editor.
+func CustomIconNames() map[string]bool {
+	iconMode.mu.RLock()
+	defer iconMode.mu.RUnlock()
+	out := make(map[string]bool, len(iconMode.have))
+	for k, v := range iconMode.have {
+		out[k] = v
+	}
+	return out
+}
+
+const maxIconBytes = 512 << 10
+
+var pngMagic = []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
+
+// SaveIcon writes an uploaded picture into the icons directory.
+//
+// The filename comes from the slot and the bytes have to actually begin like a
+// PNG. Both checks are cheap, and both remove a class of problem outright
+// rather than mitigating it.
+func SaveIcon(slot string, data []byte) error {
+	if !isIconSlot(slot) {
+		return fmt.Errorf("unknown icon %q", slot)
+	}
+	if len(data) == 0 {
+		return fmt.Errorf("the file is empty")
+	}
+	if len(data) > maxIconBytes {
+		return fmt.Errorf("the icon is %dKB and the limit is %dKB",
+			len(data)>>10, maxIconBytes>>10)
+	}
+	if !bytes.HasPrefix(data, pngMagic) {
+		return fmt.Errorf("only PNG files are accepted")
+	}
+	if err := os.MkdirAll(iconsDir(), 0o755); err != nil {
+		return err
+	}
+	// Written the same way as the data file: temp then rename, so a half
+	// received upload is never what the board picks up.
+	path := filepath.Join(iconsDir(), slot+".png")
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+// RemoveIcon drops a custom picture, returning that slot to its drawing.
+func RemoveIcon(slot string) error {
+	if !isIconSlot(slot) {
+		return fmt.Errorf("unknown icon %q", slot)
+	}
+	if err := os.Remove(filepath.Join(iconsDir(), slot+".png")); err != nil &&
+		!os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 // IconSVG renders an icon by id. An unknown or empty id yields nothing rather
 // than a placeholder, so an item with no icon simply shows its name.
 func IconSVG(id string) template.HTML {
-	ic, ok := iconByID[id]
+	iconMode.mu.RLock()
+	custom, have := iconMode.custom, iconMode.have[id]
+	iconMode.mu.RUnlock()
+
+	// have is only ever set for names taken from the slot allowlist, so the id
+	// can go straight into the URL.
+	if custom && have {
+		return template.HTML(`<img class="icon" src="/icons/` + id + `.png" alt="">`)
+	}
+
+	ic, ok := lookupIcon(id)
 	if !ok {
 		return ""
 	}
