@@ -326,6 +326,53 @@ func NamedItems(st *State, on time.Time) []ItemState {
 	return out
 }
 
+// RoomNote is one item currently out to a room, shown against that room on the
+// cleaning board.
+//
+// Inventory used to live entirely behind its own tab, which meant reception had
+// to remember to go and look. On the board the notice sits in front of them
+// while they are already working the room.
+type RoomNote struct {
+	Label  string `json:"label"`
+	Icon   string `json:"icon"`
+	Status string `json:"status"` // out / due / overdue
+	DueGr  string `json:"due_gr"`
+}
+
+// RoomNotes maps each room to the items out to it on the given date.
+func RoomNotes(st *State, on time.Time) map[string][]RoomNote {
+	out := map[string][]RoomNote{}
+	for i := range st.Loans {
+		l := &st.Loans[i]
+		if !l.Out() {
+			continue
+		}
+		label, icon := l.Item, ""
+		if it := st.Item(l.Item); it != nil {
+			label, icon = it.Label, it.Icon
+		}
+		out[l.Room] = append(out[l.Room], RoomNote{
+			Label:  label,
+			Icon:   icon,
+			Status: loanStatus(l, on),
+			DueGr:  dueGr(l),
+		})
+	}
+	// Overdue first, then due, then merely out, so the room's most urgent
+	// notice is the one nearest the room number.
+	rank := map[string]int{StatusOverdue: 0, StatusDue: 1, StatusOut: 2}
+	for room := range out {
+		notes := out[room]
+		sort.SliceStable(notes, func(a, b int) bool {
+			if rank[notes[a].Status] != rank[notes[b].Status] {
+				return rank[notes[a].Status] < rank[notes[b].Status]
+			}
+			return notes[a].Label < notes[b].Label
+		})
+	}
+	return out
+}
+
 // ---------- Mutations ----------
 
 // LendItem records a loan.

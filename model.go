@@ -147,6 +147,78 @@ type State struct {
 	// items had numbered units. Read only so that data can be migrated; never
 	// written back.
 	LegacyItemTypes []legacyItemType `json:"item_types,omitempty"`
+
+	// Baked records which keycards reception has ticked off, keyed by date and
+	// listing rooms. Purely additive: a file written before keycards existed
+	// decodes as nil, and nil correctly means nothing has been ticked.
+	Baked map[string][]string `json:"baked,omitempty"`
+
+	// Settings is a pointer so that a file written before settings existed is
+	// distinguishable from one where reception has deliberately switched
+	// everything off. Absent gets the defaults; present is left alone.
+	Settings *Settings `json:"settings,omitempty"`
+}
+
+// Settings holds the preferences reception changes from the burger menu.
+type Settings struct {
+	// KeycardTracking turns on the double-click check-off on the board. The
+	// printed sheet crossed off by hand is the record; this is a second pass
+	// for reception to confirm against, so it defaults on and can be switched
+	// off by anyone who finds it noise.
+	KeycardTracking bool `json:"keycard_tracking"`
+}
+
+func defaultSettings() *Settings { return &Settings{KeycardTracking: true} }
+
+// ---------- Keycard ticks ----------
+
+func IsBaked(st *State, date, room string) bool {
+	for _, r := range st.Baked[date] {
+		if r == room {
+			return true
+		}
+	}
+	return false
+}
+
+// ToggleBaked flips one room's tick for one date and reports the new state.
+func ToggleBaked(st *State, date, room string) bool {
+	if st.Baked == nil {
+		st.Baked = map[string][]string{}
+	}
+	list := st.Baked[date]
+	for i, r := range list {
+		if r == room {
+			rest := append(list[:i:i], list[i+1:]...)
+			if len(rest) == 0 {
+				delete(st.Baked, date)
+			} else {
+				st.Baked[date] = rest
+			}
+			return false
+		}
+	}
+	st.Baked[date] = append(list, room)
+	pruneBaked(st, date)
+	return true
+}
+
+// keepBakedDays bounds how long ticks are kept. They are a same-day
+// double-check, so holding a whole season of them only grows the data file.
+const keepBakedDays = 90
+
+func pruneBaked(st *State, today string) {
+	t, err := ParseDate(today)
+	if err != nil {
+		return
+	}
+	cutoff := DayNum(t) - keepBakedDays
+	for date := range st.Baked {
+		d, err := ParseDate(date)
+		if err != nil || DayNum(d) < cutoff {
+			delete(st.Baked, date)
+		}
+	}
 }
 
 func seedState() *State {
@@ -279,6 +351,14 @@ func (s *Store) load() error {
 		st.Loans = []Loan{}
 		seeded = true
 	}
+	// A file written before the burger menu existed has no settings block.
+	// Seeding it rather than letting the zero value stand is the difference
+	// between the keycard check-off defaulting on, as intended, and defaulting
+	// off because bool happens to start false.
+	if st.Settings == nil {
+		st.Settings = defaultSettings()
+		seeded = true
+	}
 	s.state = &st
 	// Write the upgraded shape straight back, so the file on disk always
 	// matches what the app is holding rather than only after the first edit.
@@ -360,6 +440,24 @@ func (s *Store) Mutate(fn func(*State) error) error {
 		return err
 	}
 	s.undo = snapshot
+	return s.persist()
+}
+
+// MutateNoUndo applies a change and persists it without touching the undo
+// snapshot.
+//
+// Undo holds exactly one step, and it exists to protect stay data — a Check Out
+// on a mis-selected range is unreconstructable. Ticking a keycard or flipping a
+// setting is bookkeeping, and letting either consume the single undo slot would
+// quietly disarm the safety net between selecting the wrong rooms and noticing.
+func (s *Store) MutateNoUndo(fn func(*State) error) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	snapshot := s.state.clone()
+	if err := fn(s.state); err != nil {
+		s.state = snapshot // roll back partial changes
+		return err
+	}
 	return s.persist()
 }
 

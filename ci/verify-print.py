@@ -66,8 +66,13 @@ LOANS = [
 # one means either the seed above or the resolution logic changed.
 EXPECT_MARKERS = ["AF", "AN", "AN / AF", "F", "P", "S &amp; P", "---"]
 
-EXPECT_PRINT_PAGES = 7       # combined chart once, then three sections twice
+# Keycards once, combined chart once, then each of the three sections twice.
+EXPECT_PRINT_PAGES = 8
 EXPECT_COLLECT_PAGES = 1     # single sheet, padded to the same 24 ruled rows
+
+# Room 100 arrives on DATE and 102 turns over, so both need a card; 101 only
+# departs and must not appear.
+EXPECT_KEYCARD_ROOMS = ["100", "102"]
 
 
 def start(binary):
@@ -190,13 +195,27 @@ def main():
         if pages != EXPECT_PRINT_PAGES:
             failures.append(
                 f"cleaning sheet rendered {pages} pages, expected "
-                f"{EXPECT_PRINT_PAGES} (chart once, three sections twice)"
+                f"{EXPECT_PRINT_PAGES} (keycards, chart, three sections twice)"
             )
         missing = [m for m in EXPECT_MARKERS if m not in html]
         if missing:
             failures.append(f"markers missing from the sheet: {missing}")
         else:
             print(f"   markers present: {', '.join(EXPECT_MARKERS)}")
+
+        # The keycard sheet is derived from arrivals, so a rules change that
+        # stopped resolving AF would empty it silently.
+        if "ΚΛΕΙΔΟΚΑΡΤΕΣ" not in html:
+            failures.append("keycard sheet is missing from the print run")
+        else:
+            block = html.split("ΚΛΕΙΔΟΚΑΡΤΕΣ", 1)[1].split("</table>", 1)[0]
+            listed = re.findall(r'<td class="c-room">([^<]+)</td>', block)
+            if listed != EXPECT_KEYCARD_ROOMS:
+                failures.append(
+                    f"keycard sheet lists {listed}, expected {EXPECT_KEYCARD_ROOMS}"
+                )
+            else:
+                print(f"   keycards: {', '.join(listed)}")
 
         print(f"\n-- collection sheet  /inventory/print?date={DATE}")
         html, pages = render(

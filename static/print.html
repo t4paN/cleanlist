@@ -9,7 +9,7 @@
 
 <header class="no-print">
   <h1>Print preview</h1>
-  <span class="count">7 pages — full chart, then each section twice</span>
+  <span class="count">8 pages — keycards, full chart, then each section twice</span>
   <span class="spacer"></span>
   <button class="primary" onclick="window.print()">Print</button>
   <button onclick="window.close()">Close</button>
@@ -19,6 +19,48 @@
   In the print dialog open <b>More settings</b> and untick
   <b>Headers and footers</b> — the URL and page numbers come from the browser,
   not from Cleanlist, and cannot be removed from this end.
+</div>
+
+<!-- Keycards. Reception encodes these, so the sheet prints once and leads the
+     run rather than being copied twice like the floor sheets — it is the first
+     job of a changeover morning, and it is done at the desk, not in a corridor.
+     The tick column is crossed off by hand; the board's double-click check-off
+     is a second pass over the same list, not a replacement for it. -->
+<div class="sheet">
+  <table class="list keycards">
+    <colgroup>
+      <col class="c-room"><col class="c-cat"><col class="c-mark"><col class="c-tick">
+    </colgroup>
+    <thead>
+      <tr class="titlerow">
+        <th colspan="4">ΚΛΕΙΔΟΚΑΡΤΕΣ — {{.DateGr}}</th>
+      </tr>
+      <tr>
+        <th class="c-room">Δωμάτιο</th>
+        <th class="c-cat">Κατηγορία</th>
+        <th class="c-mark"></th>
+        <th class="c-tick">✓</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Keycards}}
+      <tr>
+        <td class="c-room">{{.Room}}</td>
+        <td class="c-cat">{{.Category}}</td>
+        <td class="c-mark">{{.Marker}}</td>
+        <td class="c-tick"></td>
+      </tr>
+      {{end}}
+      {{range .KeycardBlanks}}
+      <tr>
+        <td class="c-room pad">&nbsp;</td>
+        <td class="c-cat pad">&nbsp;</td>
+        <td class="c-mark pad">&nbsp;</td>
+        <td class="c-tick pad">&nbsp;</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
 </div>
 
 <!-- Combined chart: all three sections side by side, as in the original .odt -->

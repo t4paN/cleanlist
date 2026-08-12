@@ -1,9 +1,15 @@
+/* A grey-blue set rather than white on white. A reception PC sits under strip
+   lighting for a twelve-hour shift, and a full-brightness white board is tiring
+   to read across; the surfaces are tinted and the rows alternate so the eye can
+   hold its place along a row without a ruler. */
 :root {
-  --line: #c9c9c9;
-  --ink: #1a1a1a;
-  --dim: #6b6b6b;
-  --bg: #f4f4f2;
-  --panel: #fff;
+  --line: #b7c1cb;
+  --ink: #1b2229;
+  --dim: #5c6b7a;
+  --bg: #d8dfe6;      /* page, behind the cards */
+  --panel: #eef1f5;   /* card surface, and odd rows */
+  --stripe: #e2e7ee;  /* even rows, one shade down */
+  --head: #d4dbe4;    /* section headings */
   --accent: #2c5d7c;
 }
 
@@ -16,18 +22,25 @@ body {
   background: var(--bg);
 }
 
+/* The bar spans the window so the sticky edge reaches both sides, but its
+   contents line up with the columns below rather than drifting to the corners. */
 header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
   z-index: 10;
 }
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.dim { color: var(--dim); }
 
 h1 {
   font-size: 16px;
@@ -83,26 +96,43 @@ a { color: var(--accent); }
   margin: 0;
   padding: 7px 10px;
   border-bottom: 1px solid var(--line);
-  background: #eceae6;
+  background: var(--head);
   font-weight: 600;
 }
 
+/* Taller than it needs to be for the text alone. These rows are clicked at
+   speed, often by someone holding a phone in the other hand, and the extra
+   height is what separates room 214 from 215 at a glance. */
 .room {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 10px;
-  border-bottom: 1px solid #eee;
+  padding: 9px 12px;
   cursor: pointer;
   user-select: none;
+  min-height: 38px;
 }
 
-.room:last-child { border-bottom: 0; }
-.room:hover { background: #f6f9fb; }
-.room.sel { background: #d6e7f2; box-shadow: inset 3px 0 0 var(--accent); }
+/* Striping does the separating, so there are no rules between rows to add to
+   the noise. Hover and selection are stated after, at matching specificity, so
+   they win over the stripe underneath. */
+.rooms > .room:nth-child(odd)  { background: var(--panel); }
+.rooms > .room:nth-child(even) { background: var(--stripe); }
+.rooms > .room:hover           { background: #dbe7f1; }
+.rooms > .room.sel {
+  background: #cadeee;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 
 .room .no { font-weight: 600; width: 46px; }
-.room .cat { color: var(--dim); font-size: 12px; flex: 1; }
+.room .cat {
+  color: var(--dim);
+  font-size: 12px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .mk {
   font-weight: 700;
@@ -273,6 +303,132 @@ table.stays th { color: var(--dim); font-weight: 600; font-size: 12px; }
 .sub { font-size: 12px; color: var(--dim); margin: 12px 0 2px; font-weight: 600; }
 .short-row { border-top: 1px solid #eee; padding-top: 8px; margin-top: 8px; }
 
+/* ---------- Centred column group ---------- */
+
+/* The three columns used to stretch to whatever width the window happened to
+   be, which on a wide monitor left the room number and its marker at opposite
+   ends of the screen. Capped and centred, the eye travels a short line.
+   Stated after the blocks it applies to so its auto margins win over theirs. */
+.wrap {
+  max-width: 1080px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ---------- Room notices ---------- */
+
+/* Items out to a room, shown on the cleaning board itself. Overdue first — see
+   RoomNotes in inventory.go. */
+.notes { display: flex; align-items: center; gap: 3px; flex: none; }
+.note { display: inline-flex; color: var(--dim); }
+.note .icon { margin-right: 0; width: 15px; height: 15px; }
+.note.n-due     { color: #8a6a12; }
+.note.n-overdue { color: #a13b3b; }
+
+/* ---------- Keycards ---------- */
+
+/* Red until the card is made, blue once it is. The printed sheet is still the
+   record; this is the second pass, and it is off unless the burger menu says
+   otherwise. */
+.kc {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  border: 1px solid #c98a8a;
+  background: #f6d5d5;
+  color: #8b2a2a;
+  cursor: pointer;
+  flex: none;
+}
+.kc .icon { margin-right: 0; width: 16px; height: 16px; }
+.kc-done {
+  border-color: #7ea6c8;
+  background: #d2e2f2;
+  color: #245074;
+}
+
+/* With the check-off switched off the badge still says a card is needed — that
+   is the cleaning board's business — but it stops being a control. */
+body:not(.kc-track) .kc {
+  border-color: var(--line);
+  background: var(--stripe);
+  color: var(--dim);
+  cursor: inherit;
+}
+
+.mk-kc {
+  background: #f6d5d5;
+  color: #8b2a2a;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+}
+.mk-kc .icon { margin-right: 0; width: 14px; height: 14px; }
+
+/* ---------- Burger menu ---------- */
+
+.menu { position: relative; }
+
+.burger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 36px;
+  height: 32px;
+  padding: 0 8px;
+}
+.burger span {
+  display: block;
+  height: 2px;
+  background: var(--ink);
+  border-radius: 1px;
+}
+
+.menu-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 240px;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  box-shadow: 0 6px 18px rgba(20, 30, 40, .18);
+  z-index: 20;
+}
+.menu-pop[hidden] { display: none; }
+
+.menu-pop a {
+  display: block;
+  padding: 7px 8px;
+  border-radius: 3px;
+  text-decoration: none;
+}
+.menu-pop a:hover { background: var(--stripe); }
+
+.menu-sep { height: 1px; background: var(--line); margin: 6px 0; }
+
+.menu-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  cursor: pointer;
+}
+.menu-toggle input { width: auto; padding: 0; }
+
+.menu-note {
+  margin: 2px 8px 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--dim);
+}
+
 /* ---------- Print ---------- */
 
 .sheet { padding: 0 12px 24px; }
@@ -333,6 +489,14 @@ table.list.collect .c-item .icon {
   vertical-align: -0.35em;
   stroke-width: 1.9;
 }
+
+/* Keycard sheet: room, who the guest is booked under, the marker that put them
+   on the list, and a box to cross off. 3 + 8.5 + 2.8 + 3.7 = 18cm, which is A4
+   portrait less the 15mm margins. */
+table.list.keycards .c-room { width: 3cm; }
+table.list.keycards .c-cat  { width: 8.5cm; text-align: left; }
+table.list.keycards .c-mark { width: 2.8cm; font-weight: 700; white-space: nowrap; }
+table.list.keycards .c-tick { width: 3.7cm; }
 
 table.list.collect .c-room { width: 2.6cm; }
 table.list.collect .c-item { width: 7.5cm; text-align: left; }

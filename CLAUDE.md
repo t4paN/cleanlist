@@ -22,8 +22,11 @@ build step, no CDN. HTML/CSS/JS are plain and embedded in the binary.
 
 ```
 main.go             HTTP server, routes, API handlers, page data
-model.go            rooms, stays, categories, Store (persistence)
+model.go            rooms, stays, categories, settings, Store (persistence)
 rules.go            date arithmetic and marker resolution
+keycards.go         which rooms need a card encoded, derived from arrivals
+inventory.go        loanable items, loans, collections, room notices
+icons.go            inline SVG icon set
 rules_test.go       rules coverage including the DST guard
 static/             embedded assets — templates, CSS, JS
 ```
@@ -158,6 +161,48 @@ Static, in `Sections` in `model.go`. Order within a section is the print order.
 Room IDs are strings — `A01` and `A02` exist. Changing the room list requires a
 rebuild; that is accepted.
 
+## Keycards
+
+`keycards.go`. A card has to be encoded for every guest who arrives, so the list
+is every room resolving to `AF` or `AN / AF` on the day — `NeedsKeycard` is the
+single place that decision is made.
+
+**The list is derived, never stored.** It reads the same stays the cleaning
+board reads, so it cannot drift out of step with the sheet printed beside it,
+and a stay edited after printing produces a corrected list on the next print
+rather than a stale one. Do not add a keycard table to the data file.
+
+The sheet leads the print run and prints **once**, unlike the floor sheets which
+print twice. Encoding cards is a reception job done at the desk, not a
+housekeeping one done in a corridor, so there is nobody to hand the second copy
+to.
+
+### The tick
+
+`State.Baked` maps a date to the rooms whose cards have been made, and the board
+double-clicks it on and off. It is a second pass for reception to confirm
+against — the printed sheet, crossed off by hand, is still the record. Two
+things about it matter:
+
+- **It goes through `MutateNoUndo`, not `Mutate`.** Undo holds exactly one step
+  and exists to protect stay data. Letting a keycard tick spend that step would
+  quietly disarm the safety net between a mis-selected Check Out and losing the
+  stays. Any future bookkeeping gesture belongs on the same path.
+- **Ticks are pruned to `keepBakedDays`.** They are a same-day double-check;
+  keeping a season of them grows the data file for nothing.
+
+`Baked` is additive and decodes as nil from an older file, where nil correctly
+means nothing has been ticked. No migration was needed.
+
+### Settings
+
+`State.Settings` is a **pointer** so that a file written before settings existed
+is distinguishable from one where reception deliberately switched everything
+off. Absent is seeded with `defaultSettings()` in `load`; present is left alone.
+Had it been a plain struct, the keycard check-off would have defaulted off on
+every existing installation purely because `bool` starts `false`. Follow that
+pattern for any setting whose default is not the zero value.
+
 ## Inventory
 
 `inventory.go` holds the loanable-items domain: `Item`, `Loan`, and the
@@ -203,9 +248,9 @@ written straight back so the file on disk always matches what the app holds.
 
 ## Print output
 
-The cleaning sheet is seven pages: the combined chart once, then each of the
-three sections twice. The collection sheet at `/inventory/print` is a separate
-single page, padded to the same 24 ruled rows.
+The cleaning sheet is eight pages: the keycard list once, the combined chart
+once, then each of the three sections twice. The collection sheet at
+`/inventory/print` is a separate single page, padded to the same 24 ruled rows.
 Both copies of a section are deliberately identical — housekeepers split the
 floors between themselves, so do not try to divide the rooms between the copies.
 
@@ -243,7 +288,7 @@ doc.write_pdf('preview.pdf')
 EOF
 ```
 
-Then check the page count is still 7 and measure the columns rather than
+Then check the page count is still 8 and measure the columns rather than
 eyeballing them:
 
 ```sh

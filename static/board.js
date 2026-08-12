@@ -143,4 +143,56 @@ $('btn-out').onclick = async () => {
   } catch (e) { showErr(e.message); }
 };
 
+// --- Burger menu ---
+const menuPop = $('menu-pop');
+const menuBtn = $('btn-menu');
+
+function setMenu(open) {
+  menuPop.hidden = !open;
+  menuBtn.setAttribute('aria-expanded', String(open));
+}
+
+menuBtn.onclick = (e) => {
+  e.stopPropagation();
+  setMenu(menuPop.hidden);
+};
+// Clicking anywhere else closes it, but not a click inside the menu itself —
+// flipping the toggle should not dismiss the thing you are reading.
+document.addEventListener('click', (e) => {
+  if (!menuPop.hidden && !menuPop.contains(e.target)) setMenu(false);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') setMenu(false);
+});
+
+$('opt-kc').onchange = async (e) => {
+  const on = e.target.checked;
+  document.body.classList.toggle('kc-track', on);
+  try {
+    await post('/api/settings', { keycard_tracking: on });
+  } catch (err) {
+    e.target.checked = !on;
+    document.body.classList.toggle('kc-track', !on);
+    showErr(err.message);
+  }
+};
+
+// --- Keycards ---
+// Double-click ticks a card off. Single clicks are swallowed so that aiming at
+// the badge never selects the room underneath by accident.
+document.querySelectorAll('.kc').forEach((el) => {
+  el.addEventListener('click', (e) => e.stopPropagation());
+  el.addEventListener('dblclick', async (e) => {
+    e.stopPropagation();
+    if (!document.body.classList.contains('kc-track')) return;
+    try {
+      const { baked } = await post('/api/keycard', {
+        date: $('date').value,
+        room: el.dataset.room,
+      });
+      el.classList.toggle('kc-done', baked);
+    } catch (err) { showErr(err.message); }
+  });
+});
+
 paint();

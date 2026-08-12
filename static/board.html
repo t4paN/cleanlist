@@ -5,51 +5,84 @@
 <title>Cleanlist — {{.DateGr}}</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body{{if .KeycardTracking}} class="kc-track"{{end}}>
 
 <header>
-  <h1>Cleanlist</h1>
-  <label class="row">
-    <span style="color:var(--dim)">Ημερομηνία</span>
-    <input type="date" id="date" value="{{.Date}}">
-  </label>
-  <button id="btn-today">Σήμερα</button>
-  <span class="spacer"></span>
-  <span class="count" id="count">0 selected</span>
-  <button id="btn-in" class="primary" disabled>Check In</button>
-  <button id="btn-out" disabled>Check Out</button>
-  <button id="btn-clear" disabled>Clear</button>
-  <button id="btn-undo" {{if not .CanUndo}}disabled{{end}}>Undo</button>
-  <button id="btn-print" class="primary">Print</button>
-  <a href="/inventory">Inventory</a>
-  <a href="/categories">Categories</a>
+  <div class="bar wrap">
+    <h1>Cleanlist</h1>
+    <label class="row">
+      <span class="dim">Ημερομηνία</span>
+      <input type="date" id="date" value="{{.Date}}">
+    </label>
+    <button id="btn-today">Σήμερα</button>
+    <span class="spacer"></span>
+    <span class="count" id="count">0 selected</span>
+    <button id="btn-in" class="primary" disabled>Check In</button>
+    <button id="btn-out" disabled>Check Out</button>
+    <button id="btn-clear" disabled>Clear</button>
+    <button id="btn-undo" {{if not .CanUndo}}disabled{{end}}>Undo</button>
+    <button id="btn-print" class="primary">Print</button>
+
+    <div class="menu">
+      <button id="btn-menu" class="burger" aria-label="Menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="menu-pop" id="menu-pop" hidden>
+        <a href="/inventory">Collections</a>
+        <a href="/categories">Categories</a>
+        <div class="menu-sep"></div>
+        <label class="menu-toggle">
+          <input type="checkbox" id="opt-kc"{{if .KeycardTracking}} checked{{end}}>
+          <span>Keycard check-off</span>
+        </label>
+        <p class="menu-note">
+          Double-click a keycard to mark it made. The printed sheet, crossed
+          off by hand, is still the record — this is only a second pass.
+        </p>
+      </div>
+    </div>
+  </div>
 </header>
 
-<div id="err" class="err" style="display:none"></div>
+<div id="err" class="err wrap" style="display:none"></div>
 
-<div class="totals">
+<div class="totals wrap">
   <span class="totals-label">Σύνολα {{.DateGr}}</span>
   {{range $i, $t := .Totals}}
   <span class="total{{if eq $i 3}} group-break{{end}}"><span class="mk {{$t.Class}}">{{$t.Marker}}</span><b>{{$t.Count}}</b></span>
   {{end}}
+  <span class="total group-break" title="Keycards to encode">
+    <span class="mk mk-kc">{{icon "key"}}</span><b>{{.Keycards}}</b>
+  </span>
 </div>
 
-<div class="board">
+<div class="board wrap">
 {{range .Sections}}
   <div class="section" data-section="{{.Key}}">
     <h2>{{.Label}}</h2>
+    <div class="rooms">
     {{range .Cells}}
-    <div class="room" data-room="{{.Room}}">
-      <span class="no">{{.Room}}</span>
-      <span class="cat">{{.Category}}</span>
-      <span class="mk {{markerClass .Marker}}">{{.Marker}}</span>
-    </div>
+      <div class="room" data-room="{{.Room}}">
+        <span class="no">{{.Room}}</span>
+        <span class="cat">{{.Category}}</span>
+        <span class="notes">
+          {{range .Notes}}
+          <span class="note n-{{.Status}}" title="{{.Label}}{{if .DueGr}} — {{.DueGr}}{{end}}">{{icon .Icon}}</span>
+          {{end}}
+        </span>
+        {{if .Keycard}}
+        <span class="kc{{if .Baked}} kc-done{{end}}" data-room="{{.Room}}"
+              title="Keycard needed — double-click when it is made">{{icon "key"}}</span>
+        {{end}}
+        <span class="mk {{markerClass .Marker}}">{{.Marker}}</span>
+      </div>
     {{end}}
+    </div>
   </div>
 {{end}}
 </div>
 
-<div class="panel" id="detail" style="display:none">
+<div class="panel wrap" id="detail" style="display:none">
   <div class="sub">Stays — <span id="detail-room"></span></div>
   <table class="stays">
     <thead><tr><th>Category</th><th>Arrival</th><th>Departure</th><th></th></tr></thead>

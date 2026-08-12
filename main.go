@@ -111,6 +111,8 @@ func main() {
 	mux.HandleFunc("/api/checkout", jsonPost(apiCheckOut))
 	mux.HandleFunc("/api/stay/delete", jsonPost(apiDeleteStay))
 	mux.HandleFunc("/api/undo", jsonPost(apiUndo))
+	mux.HandleFunc("/api/keycard", jsonPost(apiKeycardToggle))
+	mux.HandleFunc("/api/settings", jsonPost(apiSettings))
 	mux.HandleFunc("/api/categories", jsonPost(apiSaveCategories))
 	mux.HandleFunc("/api/preview", jsonPost(apiPreview))
 	mux.HandleFunc("/api/room", apiRoom)
@@ -186,6 +188,20 @@ type boardSection struct {
 	Blanks []struct{}
 }
 
+// BoardCell is one room as the board shows it: the cleaning marker plus
+// everything else reception would otherwise have to open another page to see.
+type BoardCell struct {
+	Cell
+	Keycard bool
+	Baked   bool
+	Notes   []RoomNote
+}
+
+type boardSectionUI struct {
+	Section
+	Cells []BoardCell
+}
+
 // printRows is the tallest section, and therefore the row count every printed
 // sheet is padded to.
 const printRows = 24
@@ -235,13 +251,27 @@ func handleBoard(w http.ResponseWriter, r *http.Request) {
 		"Tomorrow": FormatDate(time.Now().AddDate(0, 0, 1)),
 	}
 	store.Read(func(st *State) {
-		secs := []boardSection{}
+		notes := RoomNotes(st, d)
+		date := FormatDate(d)
+		secs := []boardSectionUI{}
 		for _, s := range Sections {
-			secs = append(secs, boardSection{s, SectionCells(st, s, d), nil})
+			bs := boardSectionUI{Section: s}
+			for _, c := range SectionCells(st, s, d) {
+				kc := NeedsKeycard(c.Marker)
+				bs.Cells = append(bs.Cells, BoardCell{
+					Cell:    c,
+					Keycard: kc,
+					Baked:   kc && IsBaked(st, date, c.Room),
+					Notes:   notes[c.Room],
+				})
+			}
+			secs = append(secs, bs)
 		}
 		data["Sections"] = secs
 		data["Categories"] = st.Categories
 		data["Totals"] = serviceTotals(st, d)
+		data["Keycards"] = len(KeycardsFor(st, d))
+		data["KeycardTracking"] = st.Settings != nil && st.Settings.KeycardTracking
 	})
 	render(w, "board.html", data)
 }
@@ -291,6 +321,12 @@ func handlePrint(w http.ResponseWriter, r *http.Request) {
 		data["Sections"] = secs
 		data["Master"] = buildMaster(st, d)
 		data["MasterHeads"] = Sections
+		// The keycard sheet leads the run and prints once. Encoding cards is a
+		// reception job, not a housekeeping one, so it does not get the second
+		// copy the floor sheets do.
+		kc := KeycardsFor(st, d)
+		data["Keycards"] = kc
+		data["KeycardBlanks"] = padTo(len(kc))
 	})
 	render(w, "print.html", data)
 }
@@ -414,6 +450,55 @@ func apiDeleteStay(r *http.Request) (any, error) {
 }
 
 func apiUndo(r *http.Request) (any, error) { return nil, store.Undo() }
+
+// apiKeycardToggle ticks one keycard off, or un-ticks it.
+//
+// Deliberately on MutateNoUndo: this is a double-check, and it must not spend
+// the single undo step that stands between a mis-selected Check Out and lost
+// stay data.
+func apiKeycardToggle(r *http.Request) (any, error) {
+	var req struct {
+		Date string `json:"date"`
+		Room string `json:"room"`
+	}
+	if err := decode(r, &req); err != nil {
+		return nil, err
+	}
+	if _, err := ParseDate(req.Date); err != nil {
+		return nil, fmt.Errorf("bad date")
+	}
+	if SectionOf(req.Room) == "" {
+		return nil, fmt.Errorf("unknown room %q", req.Room)
+	}
+	baked := false
+	if err := store.MutateNoUndo(func(st *State) error {
+		baked = ToggleBaked(st, req.Date, req.Room)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return map[string]any{"baked": baked}, nil
+}
+
+func apiSettings(r *http.Request) (any, error) {
+	var req struct {
+		// A pointer so that an absent field leaves the setting alone rather
+		// than switching it off.
+		KeycardTracking *bool `json:"keycard_tracking"`
+	}
+	if err := decode(r, &req); err != nil {
+		return nil, err
+	}
+	return nil, store.MutateNoUndo(func(st *State) error {
+		if st.Settings == nil {
+			st.Settings = defaultSettings()
+		}
+		if req.KeycardTracking != nil {
+			st.Settings.KeycardTracking = *req.KeycardTracking
+		}
+		return nil
+	})
+}
 
 func apiSaveCategories(r *http.Request) (any, error) {
 	var req struct {
