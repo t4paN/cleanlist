@@ -2,8 +2,12 @@ name: Release
 
 # Tag a commit and the binaries appear on the releases page:
 #
-#     git tag -a v1.0.0 -m "First release"
+#     git tag -a v1.0.0 --cleanup=verbatim -F notes.md
 #     git push origin v1.0.0
+#
+# The tag's message becomes the top of the release notes. Pass
+# --cleanup=verbatim or git strips every line starting with '#' as a comment,
+# which eats Markdown headings without saying so.
 #
 # This is the replacement for carrying a USB stick to the reception PC. Email
 # providers block .exe attachments even inside a zip; a release download link

@@ -141,9 +141,15 @@ carrying a USB stick — email providers block `.exe` attachments even inside a
 zip, but a release download link does not have that problem.
 
 ```sh
-git tag -a v1.2.0 -m "..."
+git tag -a v1.2.0 --cleanup=verbatim -F notes.md
 git push origin v1.2.0
 ```
+
+The tag's message is the top of the release notes (added in v1.2.0), so write
+it for whoever downloads the exe. **`--cleanup=verbatim` is not optional:**
+without it git strips every line starting with `#` as a comment, which silently
+eats Markdown headings. That happened to v1.2.0 and the notes were patched by
+hand afterwards.
 
 Binaries are also uploaded as artifacts on every CI run, so a build can be
 pulled from any green run without tagging.
