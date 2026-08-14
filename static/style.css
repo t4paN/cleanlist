@@ -11,6 +11,7 @@
   --stripe: #e2e7ee;  /* even rows, one shade down */
   --head: #d4dbe4;    /* section headings */
   --accent: #2c5d7c;
+  --owed: #c0392b;    /* unpaid — the only red on the board */
 }
 
 * { box-sizing: border-box; }
@@ -122,6 +123,34 @@ a { color: var(--accent); }
 .rooms > .room.sel {
   background: #cadeee;
   box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Unpaid: a red edge and a halo around it, readable from across the desk.
+   Deliberately not animated — this sits on screen all day, and a board that
+   pulses is a board people stop looking at. The outline is drawn inside the
+   row so it cannot shift the layout, and z-index lifts the halo over the
+   striped neighbour that would otherwise paint on top of it. */
+.rooms > .room.unpaid {
+  outline: 2px solid var(--owed);
+  outline-offset: -2px;
+  box-shadow: 0 0 7px 1px rgba(192, 57, 43, 0.55);
+  position: relative;
+  z-index: 1;
+}
+
+/* Selection keeps its bar; the two shadows have to be declared together
+   because the second box-shadow would otherwise replace the first. */
+.rooms > .room.unpaid.sel {
+  box-shadow: 0 0 7px 1px rgba(192, 57, 43, 0.55), inset 3px 0 0 var(--accent);
+}
+
+/* Someone who cannot pick the red out of the stripes still gets a mark. */
+.rooms > .room.unpaid .no::after {
+  content: "•";
+  color: var(--owed);
+  font-size: 15px;
+  line-height: 0;
+  margin-left: 3px;
 }
 
 .room .no { font-weight: 600; width: 46px; }

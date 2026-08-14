@@ -119,6 +119,7 @@ func main() {
 	mux.HandleFunc("/api/stay/delete", jsonPost(apiDeleteStay))
 	mux.HandleFunc("/api/undo", jsonPost(apiUndo))
 	mux.HandleFunc("/api/keycard", jsonPost(apiKeycardToggle))
+	mux.HandleFunc("/api/paid", jsonPost(apiPaid))
 	mux.HandleFunc("/api/settings", jsonPost(apiSettings))
 	// "/icons" is the editor and "/icons/" serves the files. Registering both
 	// is how ServeMux distinguishes an exact path from a subtree.
@@ -208,6 +209,12 @@ type BoardCell struct {
 	Keycard bool
 	Baked   bool
 	Notes   []RoomNote
+
+	// Occupied on Cell already says a guest is in the room. These two say
+	// whether the money has come in and whether there is anything to pay for,
+	// which the Paid button needs in order to know what it can act on.
+	Unpaid  bool
+	Payable bool
 }
 
 type boardSectionUI struct {
@@ -271,11 +278,14 @@ func handleBoard(w http.ResponseWriter, r *http.Request) {
 			bs := boardSectionUI{Section: s}
 			for _, c := range SectionCells(st, s, d) {
 				kc := NeedsKeycard(c.Marker)
+				payable := OccupiedOn(st, c.Room, d)
 				bs.Cells = append(bs.Cells, BoardCell{
 					Cell:    c,
 					Keycard: kc,
 					Baked:   kc && IsBaked(st, date, c.Room),
 					Notes:   notes[c.Room],
+					Payable: payable,
+					Unpaid:  payable && UnpaidOn(st, c.Room, d),
 				})
 			}
 			secs = append(secs, bs)
@@ -500,6 +510,58 @@ func apiKeycardToggle(r *http.Request) (any, error) {
 		name = "keycardblue"
 	}
 	return map[string]any{"baked": baked, "icon": string(IconSVG(name))}, nil
+}
+
+// apiPaid records that the money for a room has come in, or takes that back.
+//
+// On MutateNoUndo for the same reason as the keycard tick: undo holds exactly
+// one step and exists to protect stay data from a mis-selected Check Out.
+// Bookkeeping gestures must not spend it. Reversal is what the paid flag in the
+// request is for — a room marked paid by accident has to be correctable, or the
+// hotel quietly loses track of a real debt.
+func apiPaid(r *http.Request) (any, error) {
+	var req struct {
+		Rooms []string `json:"rooms"`
+		Date  string   `json:"date"`
+		Paid  *bool    `json:"paid"`
+	}
+	if err := decode(r, &req); err != nil {
+		return nil, err
+	}
+	d, err := ParseDate(req.Date)
+	if err != nil {
+		return nil, fmt.Errorf("bad date")
+	}
+	if len(req.Rooms) == 0 {
+		return nil, fmt.Errorf("nothing selected")
+	}
+	paid := true
+	if req.Paid != nil {
+		paid = *req.Paid
+	}
+	for _, room := range req.Rooms {
+		if SectionOf(room) == "" {
+			return nil, fmt.Errorf("unknown room %q", room)
+		}
+	}
+	return nil, store.MutateNoUndo(func(st *State) error {
+		// Every room is checked before anything is written, so a selection that
+		// includes a vacant room changes nothing at all rather than half of it.
+		empty := []string{}
+		for _, room := range req.Rooms {
+			if !OccupiedOn(st, room, d) {
+				empty = append(empty, room)
+			}
+		}
+		if len(empty) > 0 {
+			return fmt.Errorf("no stay on %s in room %s",
+				FormatGreek(d), strings.Join(empty, ", "))
+		}
+		for _, room := range req.Rooms {
+			SetPaid(st, room, d, paid)
+		}
+		return nil
+	})
 }
 
 func apiSettings(r *http.Request) (any, error) {
@@ -809,6 +871,30 @@ func handleInventory(w http.ResponseWriter, r *http.Request) {
 	render(w, "inventory.html", data)
 }
 
+// UnpaidRow is one line of the unpaid list printed behind the collection sheet.
+// Departure is what makes it actionable: a guest leaving tomorrow who has not
+// paid is a different problem from one staying another week.
+type UnpaidRow struct {
+	Room     string
+	Category string
+	Departs  string
+}
+
+func unpaidRows(st *State, d time.Time) []UnpaidRow {
+	out := []UnpaidRow{}
+	for _, room := range UnpaidRooms(st, d) {
+		row := UnpaidRow{Room: room}
+		if s := UnpaidStay(st, room, d); s != nil {
+			if c := st.Category(s.Category); c != nil {
+				row.Category = c.Label
+			}
+			row.Departs = displayDate(s.Departure)
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
 func handleCollectionPrint(w http.ResponseWriter, r *http.Request) {
 	d := queryDate(r)
 	data := map[string]any{"DateGr": FormatGreek(d)}
@@ -816,6 +902,11 @@ func handleCollectionPrint(w http.ResponseWriter, r *http.Request) {
 		items := Collections(st, d)
 		data["Items"] = items
 		data["Blanks"] = padTo(len(items))
+		// The unpaid list is its own page and only exists when something is
+		// owed, so a day where everyone has paid still prints one sheet.
+		unpaid := unpaidRows(st, d)
+		data["Unpaid"] = unpaid
+		data["UnpaidBlanks"] = padTo(len(unpaid))
 	})
 	render(w, "collect.html", data)
 }

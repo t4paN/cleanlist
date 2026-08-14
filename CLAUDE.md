@@ -203,6 +203,33 @@ Had it been a plain struct, the keycard check-off would have defaulted off on
 every existing installation purely because `bool` starts `false`. Follow that
 pattern for any setting whose default is not the zero value.
 
+## Payment
+
+`Stay.Paid` records that reception has taken the money. Three things about it
+matter more than the feature itself:
+
+- **It belongs to the stay, not the room.** A room is not paid; a guest is. Hang
+  it off the room and the next arrival inherits the last guest's settled bill.
+- **Unpaid is the zero value, and that is the only honest default.** A stay from
+  an older data file is one nobody has confirmed payment for. The consequence is
+  real and was accepted deliberately: on the first run after upgrading, every
+  occupied room glows red until reception works through them once. Do not add a
+  migration that marks old stays paid — that asserts money arrived when nothing
+  knows whether it did.
+- **`UnpaidOn` asks whether *any* covering stay is unpaid.** On a turnover day
+  both guests cover the date, and either one owing has to show. `SetPaid` marks
+  all of them, so one press settles the day.
+
+`/api/paid` runs on `MutateNoUndo`, like the keycard tick: undo holds one step
+and exists to protect stay data from a mis-selected Check Out, and a bookkeeping
+gesture must not spend it. The request carries an explicit `paid` boolean
+because the flag has to be reversible — a room marked by accident with no way
+back means the hotel quietly loses a debt. The board's button flips to "Not
+paid" when everything selected is already settled.
+
+A selection containing a vacant room is refused whole rather than applied in
+part, so a fat-fingered range never half-lands.
+
 ## Dates
 
 Two formats, and they must not be confused:
@@ -315,9 +342,15 @@ that can drift apart.
 
 The cleaning sheet is eight pages: the keycard list once, the combined chart
 once, then each of the three sections twice. The collection sheet at
-`/inventory/print` is a separate single page, padded to the same 24 ruled rows.
-Both copies of a section are deliberately identical — housekeepers split the
-floors between themselves, so do not try to divide the rooms between the copies.
+`/inventory/print` is one page, padded to the same 24 ruled rows, plus a second
+**unpaid rooms** page when anything is owed — that page is conditional, so a day
+with nothing outstanding still prints a single sheet rather than a page of empty
+rules. Both copies of a section are deliberately identical — housekeepers split
+the floors between themselves, so do not try to divide the rooms between the
+copies.
+
+Pages come from `.sheet` divs: `break-before: page` on each, `auto` on the
+first. Adding a page means adding a `.sheet`, not fiddling with the padding.
 
 - Combined chart: six columns, room + marker for each of the three sections. No
   notes column.

@@ -54,5 +54,42 @@
   </table>
 </div>
 
+{{if .Unpaid}}
+<div class="sheet">
+  <table class="list collect">
+    <colgroup>
+      <col class="c-room"><col class="c-item"><col class="c-due"><col class="c-note">
+    </colgroup>
+    <thead>
+      <tr class="titlerow"><th colspan="4">ΑΠΛΗΡΩΤΑ ΔΩΜΑΤΙΑ — {{.DateGr}}</th></tr>
+      <tr>
+        <th class="c-room">Δωμάτιο</th>
+        <th class="c-item">Κατηγορία</th>
+        <th class="c-due">Αναχώρηση</th>
+        <th class="c-note">✓</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Unpaid}}
+      <tr>
+        <td class="c-room">{{.Room}}</td>
+        <td class="c-item">{{.Category}}</td>
+        <td class="c-due">{{.Departs}}</td>
+        <td class="c-note">&nbsp;</td>
+      </tr>
+      {{end}}
+      {{range .UnpaidBlanks}}
+      <tr>
+        <td class="c-room">&nbsp;</td>
+        <td class="c-item">&nbsp;</td>
+        <td class="c-due">&nbsp;</td>
+        <td class="c-note">&nbsp;</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
 </body>
 </html>{{end}}

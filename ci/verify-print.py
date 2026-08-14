@@ -73,7 +73,16 @@ EXPECT_MONTH = "Ιούλ"
 
 # Keycards once, combined chart once, then each of the three sections twice.
 EXPECT_PRINT_PAGES = 8
-EXPECT_COLLECT_PAGES = 1     # single sheet, padded to the same 24 ruled rows
+
+# Stays seed as unpaid, so the collection print carries its unpaid page too.
+# Once everything is marked paid that page goes away and the sheet is a single
+# padded page again — both are checked, because "no unpaid rooms" is the state
+# the hotel should mostly be in and it must not print a blank second sheet.
+EXPECT_COLLECT_PAGES = 2
+EXPECT_COLLECT_PAID_PAGES = 1
+
+# Every room with a guest in it on DATE, in printed order.
+EXPECT_UNPAID_ROOMS = ["100", "101", "102", "201", "202", "203", "204", "205", "301"]
 
 # Room 100 arrives on DATE and 102 turns over, so both need a card; 101 only
 # departs and must not appear.
@@ -237,6 +246,21 @@ def main():
             if label not in html:
                 failures.append(f"collection sheet is missing {label!r}")
 
+        # The unpaid page. Everything seeds unpaid, so it should list every
+        # room occupied on DATE, in printed order.
+        if "ΑΠΛΗΡΩΤΑ ΔΩΜΑΤΙΑ" not in html:
+            failures.append("unpaid page is missing from the collection print")
+        else:
+            block = html.split("ΑΠΛΗΡΩΤΑ ΔΩΜΑΤΙΑ", 1)[1]
+            listed = [r for r in re.findall(r'<td class="c-room">([^<]+)</td>', block)
+                      if r.strip() and r != "&nbsp;"]
+            if listed != EXPECT_UNPAID_ROOMS:
+                failures.append(
+                    f"unpaid page lists {listed}, expected {EXPECT_UNPAID_ROOMS}"
+                )
+            else:
+                print(f"   unpaid: {', '.join(listed)}")
+
         # Both sheets again with month names switched on. This is the wider of
         # the two date formats -- an overdue line reads "26-Ιούλ-26 (+6)" -- and
         # the due column on the collection sheet is a fixed 3.6cm, so the mode
@@ -263,6 +287,24 @@ def main():
                     f"setting on — expected {EXPECT_MONTH!r}"
                 )
         post(url, "/api/settings", {"month_names": False})
+
+        # Everything paid: the unpaid page must disappear rather than print as
+        # a page of empty ruled rows.
+        print("\n-- all rooms paid")
+        post(url, "/api/paid",
+             {"rooms": EXPECT_UNPAID_ROOMS, "date": DATE, "paid": True})
+        html, pages = render(
+            url, f"/inventory/print?date={DATE}", css,
+            os.path.join(args.out, f"collection-paid-{DATE}.pdf"),
+        )
+        print(f"   collection: {pages} pages (expected {EXPECT_COLLECT_PAID_PAGES})")
+        if pages != EXPECT_COLLECT_PAID_PAGES:
+            failures.append(
+                f"with nothing owed the collection sheet rendered {pages} "
+                f"pages, expected {EXPECT_COLLECT_PAID_PAGES}"
+            )
+        if "ΑΠΛΗΡΩΤΑ ΔΩΜΑΤΙΑ" in html:
+            failures.append("unpaid page still prints with every room paid")
     finally:
         proc.kill()
         shutil.rmtree(tmp, ignore_errors=True)

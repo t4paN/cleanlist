@@ -19,6 +19,7 @@
     <span class="count" id="count">0 selected</span>
     <button id="btn-in" class="primary" disabled>Check In</button>
     <button id="btn-out" disabled>Check Out</button>
+    <button id="btn-paid" disabled>Paid</button>
     <button id="btn-clear" disabled>Clear</button>
     <button id="btn-undo" {{if not .CanUndo}}disabled{{end}}>Undo</button>
     <button id="btn-print" class="primary">Print</button>
@@ -77,7 +78,9 @@
     <h2>{{.Label}}</h2>
     <div class="rooms">
     {{range .Cells}}
-      <div class="room" data-room="{{.Room}}">
+      <div class="room{{if .Unpaid}} unpaid{{end}}" data-room="{{.Room}}"
+           data-payable="{{if .Payable}}1{{end}}" data-unpaid="{{if .Unpaid}}1{{end}}"
+           {{if .Unpaid}}title="Δεν έχει πληρωθεί"{{end}}>
         <span class="no">{{.Room}}</span>
         <span class="cat">{{.Category}}</span>
         <span class="notes">

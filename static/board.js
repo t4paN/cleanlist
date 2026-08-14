@@ -32,6 +32,12 @@ function refresh() {
 // data-gr, and changing the picker reloads the page, so the two never drift.
 const shownDate = () => $('date').dataset.gr || $('date').value;
 
+// Selected rooms that have a guest in them on the date shown. Only these can be
+// paid for, and the button reads off them.
+function payable() {
+  return rooms().filter((el) => sel.has(el.dataset.room) && el.dataset.payable);
+}
+
 function paint() {
   rooms().forEach((el) => el.classList.toggle('sel', sel.has(el.dataset.room)));
   const n = sel.size;
@@ -39,6 +45,16 @@ function paint() {
   $('btn-in').disabled = n === 0;
   $('btn-out').disabled = n === 0;
   $('btn-clear').disabled = n === 0;
+
+  // Paid only lights up for checked-in rooms, and flips to the reversal when
+  // every one of them is already settled — a room marked by accident has to be
+  // correctable or the hotel loses track of a real debt.
+  const pay = payable();
+  const allPaid = pay.length > 0 && pay.every((el) => !el.dataset.unpaid);
+  $('btn-paid').disabled = pay.length === 0;
+  $('btn-paid').textContent = allPaid ? 'Not paid' : 'Paid';
+  $('btn-paid').classList.toggle('danger', allPaid);
+
   n === 1 ? loadDetail([...sel][0]) : ($('detail').style.display = 'none');
 }
 
@@ -149,6 +165,25 @@ $('btn-out').onclick = async () => {
     `Check out ${list.length} rooms on ${shownDate()}?\n\n${list.join(', ')}`)) return;
   try {
     await post('/api/checkout', { rooms: list, date: $('date').value });
+    refresh();
+  } catch (e) { showErr(e.message); }
+};
+
+// --- Paid ---
+// Money is the one thing on this board nobody can verify by looking at the
+// room, so it always confirms, however few rooms are selected. The text names
+// every room it is about to settle.
+$('btn-paid').onclick = async () => {
+  const list = payable().map((el) => el.dataset.room).sort();
+  if (list.length === 0) return;
+  const paid = $('btn-paid').textContent === 'Paid';
+  const one = list.length === 1;
+  const ask = paid
+    ? `Confirm ${one ? `room ${list[0]} has` : `rooms ${list.join(', ')} have`} been paid in full.`
+    : `Mark ${one ? `room ${list[0]}` : `rooms ${list.join(', ')}`} as NOT paid?`;
+  if (!confirm(ask)) return;
+  try {
+    await post('/api/paid', { rooms: list, date: $('date').value, paid });
     refresh();
   } catch (e) { showErr(e.message); }
 };

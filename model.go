@@ -109,6 +109,14 @@ type Stay struct {
 	Category  string `json:"category"`
 	Arrival   string `json:"arrival"`   // YYYY-MM-DD
 	Departure string `json:"departure"` // YYYY-MM-DD
+
+	// Paid records that reception has taken the money for this stay. It is
+	// additive and unpaid is the zero value, which is the only honest default:
+	// a stay written by an older build is one nobody has confirmed payment
+	// for, and an unknown must never render as settled. The board shows unpaid
+	// occupied rooms in red, so on the first run after an upgrade the rooms
+	// with guests in them light up until reception works through them once.
+	Paid bool `json:"paid"`
 }
 
 // ---------- Categories ----------
@@ -546,6 +554,72 @@ func CoversDate(s *Stay, d time.Time) bool {
 	}
 	dn := DayNum(d)
 	return dn >= DayNum(a) && dn <= DayNum(b)
+}
+
+// OccupiedOn reports whether any stay covers d. This is what makes the Paid
+// button available: a vacant room has nothing to pay for.
+func OccupiedOn(st *State, room string, d time.Time) bool {
+	for i := range st.Stays[room] {
+		if CoversDate(&st.Stays[room][i], d) {
+			return true
+		}
+	}
+	return false
+}
+
+// UnpaidOn reports whether any stay covering d is still unpaid.
+//
+// Any, not the first: on a turnover day the outgoing and the incoming guest
+// both cover the date, and either one owing money has to show. Hiding a debt
+// behind the other guest's settled bill is the failure that matters here.
+func UnpaidOn(st *State, room string, d time.Time) bool {
+	for i := range st.Stays[room] {
+		s := &st.Stays[room][i]
+		if CoversDate(s, d) && !s.Paid {
+			return true
+		}
+	}
+	return false
+}
+
+// UnpaidStay returns the unpaid stay covering d, or nil. On a turnover day
+// where one guest has paid and the other has not, this is the one that owes.
+func UnpaidStay(st *State, room string, d time.Time) *Stay {
+	for i := range st.Stays[room] {
+		s := &st.Stays[room][i]
+		if CoversDate(s, d) && !s.Paid {
+			return s
+		}
+	}
+	return nil
+}
+
+// UnpaidRooms lists every occupied room whose stay is unpaid on d, in printed
+// room order so the sheet reads down the corridor like the others.
+func UnpaidRooms(st *State, d time.Time) []string {
+	out := []string{}
+	for _, room := range AllRooms() {
+		if UnpaidOn(st, room, d) {
+			out = append(out, room)
+		}
+	}
+	return out
+}
+
+// SetPaid marks every stay covering d in the given room, and reports whether it
+// found one. A room with no stay on the date is refused by the caller rather
+// than passed over quietly — a click that silently does nothing reads as a
+// click that worked.
+func SetPaid(st *State, room string, d time.Time, paid bool) bool {
+	found := false
+	for i := range st.Stays[room] {
+		s := &st.Stays[room][i]
+		if CoversDate(s, d) {
+			s.Paid = paid
+			found = true
+		}
+	}
+	return found
 }
 
 // CurrentStay returns the stay covering d, counting arrival and departure days

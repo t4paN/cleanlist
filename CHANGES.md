@@ -271,3 +271,56 @@ Month names are the wider of the two — an overdue collection line reads
 rendering rather than by counting characters. The extra PDFs land in the
 `printed-sheets-pdf` artifact as `print-months-*.pdf` and
 `collection-months-*.pdf`.
+
+## Payment tracking
+
+Three parts, all driven off one new field.
+
+**`Stay.Paid`.** Payment belongs to the stay, not the room — hang it off the
+room and the next arrival inherits the last guest's settled bill. Additive, and
+unpaid is the zero value.
+
+**Red on the board.** A room with a guest in it whose stay is unpaid gets a red
+outline and a halo, plus a small red dot by the room number for anyone who
+cannot pick the colour out of the stripes. Vacant rooms never glow. It is
+deliberately not animated: this sits on a reception screen all day, and a board
+that pulses is a board people stop looking at.
+
+**A Paid button**, between Check Out and Clear. It lights up only for selected
+rooms that actually have a guest, and always confirms — "Confirm room 210 has
+been paid in full." — however few rooms are selected, because money is the one
+thing on this board nobody can verify by looking at the room.
+
+Two things beyond the literal request, both because the alternative loses money:
+
+- **The button reverses.** When everything selected is already settled it reads
+  "Not paid" and asks "Mark room 210 as NOT paid?". A one-way flag means a
+  mis-click quietly writes off a real debt with no way back.
+- **A selection containing a vacant room is refused whole**, naming the rooms,
+  rather than marking the occupied ones and silently skipping the rest.
+
+**An unpaid page on the collection printout**, listing room, category and
+departure date in printed room order. Departure is what makes it actionable: a
+guest leaving tomorrow who has not paid is a different problem from one staying
+another week.
+
+## Upgrading to this build
+
+**Read this one.** There is no data migration and nothing changes shape, but
+there is a visible consequence the first morning.
+
+Every stay in the existing data file decodes as **unpaid**, because that is the
+zero value and nobody has said otherwise. So on first run the board shows a red
+outline on every room with a guest in it, and the collection sheet prints an
+unpaid page listing them all. Reception clears it by selecting the rooms that
+have paid and pressing Paid once — it is a few minutes on the first day and
+accurate from then on.
+
+This was a choice, not an oversight. The alternative is a migration marking
+every existing stay paid, which asserts money was received when nothing in the
+system knows whether it was. Wrong data must never look like normal data. If the
+hotel would rather start from a clean slate anyway, say so and it is a five-line
+migration — but it should be a decision someone makes out loud.
+
+**The collection sheet is now two pages when anything is owed** and one page when
+nothing is. `ci/verify-print.py` checks both states.
