@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -12,15 +14,52 @@ func ParseDate(s string) (time.Time, error) {
 
 func FormatDate(t time.Time) string { return t.Format("2006-01-02") }
 
-// FormatGreek renders DD-MM-YY, the way the hotel writes a date by hand. This
-// is the only date format shown to a person — the board, the sheets, the
-// collection list and the due dates all come through here, so changing it here
-// changes it everywhere.
+// greekMonths are the abbreviations reception writes by hand. June and July
+// need four letters to tell each other apart, which is why this is a table and
+// not a slice of the full names.
+var greekMonths = [...]string{
+	"Ιαν", "Φεβ", "Μάρ", "Απρ", "Μάι", "Ιούν",
+	"Ιούλ", "Αύγ", "Σεπ", "Οκτ", "Νοέ", "Δεκ",
+}
+
+// dateMode caches the one display choice, following the same rule as iconMode
+// in icons.go: templates execute after the Store's lock has been released, so a
+// formatter that reached back into the Store would deadlock the first time a
+// render call moved inside a Read.
+var dateMode struct {
+	mu     sync.RWMutex
+	months bool
+}
+
+// RefreshDateFormat records whether dates are written with a month name.
+// Called at startup and after a settings change.
+func RefreshDateFormat(months bool) {
+	dateMode.mu.Lock()
+	dateMode.months = months
+	dateMode.mu.Unlock()
+}
+
+// MonthNamesOn reports the current choice, for the menu checkbox.
+func MonthNamesOn() bool {
+	dateMode.mu.RLock()
+	defer dateMode.mu.RUnlock()
+	return dateMode.months
+}
+
+// FormatGreek renders a date the way the hotel writes one by hand: DD-MM-YY, or
+// DD-Mon-YY with a Greek month if that is switched on. This is the only date
+// format shown to a person — the board, the sheets, the collection list and the
+// due dates all come through here, so changing it here changes it everywhere.
 //
 // It is display only. Dates are stored, sent to the API and put in <input
 // type="date"> as ISO YYYY-MM-DD via FormatDate, and that must not change: the
 // date picker refuses anything else and the day arithmetic parses it.
-func FormatGreek(t time.Time) string { return t.Format("02-01-06") }
+func FormatGreek(t time.Time) string {
+	if !MonthNamesOn() {
+		return t.Format("02-01-06")
+	}
+	return fmt.Sprintf("%02d-%s-%02d", t.Day(), greekMonths[int(t.Month())-1], t.Year()%100)
+}
 
 // DayNum converts a time to a whole-day ordinal built from its calendar
 // components, deliberately re-anchored in UTC.

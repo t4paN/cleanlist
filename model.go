@@ -171,6 +171,12 @@ type Settings struct {
 	// icons/ directory. Off is both the intended default and the zero value, so
 	// a file written by the previous build correctly keeps the drawings.
 	CustomIcons bool `json:"custom_icons"`
+
+	// MonthNames writes the month as a Greek abbreviation — 14-Αύγ-26 instead
+	// of 14-08-26 — everywhere a date is shown, the printed sheets included.
+	// Off is both the intended default and the zero value, so an existing file
+	// keeps the all-numeric dates it already had.
+	MonthNames bool `json:"month_names"`
 }
 
 func defaultSettings() *Settings { return &Settings{KeycardTracking: true} }

@@ -12,7 +12,7 @@
     <h1>Cleanlist</h1>
     <label class="row">
       <span class="dim">Ημερομηνία</span>
-      <input type="date" id="date" value="{{.Date}}">
+      <input type="date" id="date" value="{{.Date}}" data-gr="{{.DateGr}}">
     </label>
     <button id="btn-today">Σήμερα</button>
     <span class="spacer"></span>
@@ -38,6 +38,15 @@
         <p class="menu-note">
           Double-click a keycard to mark it made. The printed sheet, crossed
           off by hand, is still the record — this is only a second pass.
+        </p>
+        <div class="menu-sep"></div>
+        <label class="menu-toggle">
+          <input type="checkbox" id="opt-months"{{if .MonthNames}} checked{{end}}>
+          <span>Month names in dates</span>
+        </label>
+        <p class="menu-note">
+          Dates read 14-Αύγ-26 instead of 14-08-26, on screen and on the
+          printed sheets.
         </p>
         <div class="menu-sep"></div>
         <label class="menu-toggle">

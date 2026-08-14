@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 // The detail panel is read to answer "who is in room 210 right now", so the
 // current stay comes first and the rest run newest-first below it.
@@ -82,6 +86,53 @@ func TestDisplayDateFormat(t *testing.T) {
 	// stays the same width on the printed sheet.
 	if got := FormatGreek(mustDate(t, "2026-01-05")); got != "05-01-26" {
 		t.Fatalf("leading zeros: got %q, want %q", got, "05-01-26")
+	}
+}
+
+// With the menu option on, the month is written out. Off is the default and the
+// zero value, so an existing data file keeps the numeric dates it had.
+func TestMonthNamesSetting(t *testing.T) {
+	defer RefreshDateFormat(false)
+
+	RefreshDateFormat(true)
+	if !MonthNamesOn() {
+		t.Fatal("setting did not take")
+	}
+	if got := FormatGreek(mustDate(t, "2026-08-14")); got != "14-Αύγ-26" {
+		t.Fatalf("got %q, want %q", got, "14-Αύγ-26")
+	}
+	if got := FormatGreek(mustDate(t, "2026-01-05")); got != "05-Ιαν-26" {
+		t.Fatalf("leading zero on the day: got %q, want %q", got, "05-Ιαν-26")
+	}
+
+	RefreshDateFormat(false)
+	if got := FormatGreek(mustDate(t, "2026-08-14")); got != "14-08-26" {
+		t.Fatalf("switching back: got %q, want %q", got, "14-08-26")
+	}
+	if defaultSettings().MonthNames {
+		t.Fatal("month names must default off")
+	}
+}
+
+// Every month has an abbreviation and June and July are distinguishable — the
+// obvious copy-paste error in a hand-written table.
+func TestGreekMonthTable(t *testing.T) {
+	defer RefreshDateFormat(false)
+	RefreshDateFormat(true)
+
+	seen := map[string]bool{}
+	for i := 1; i <= 12; i++ {
+		d := mustDate(t, fmt.Sprintf("2026-%02d-15", i))
+		got := FormatGreek(d)
+		name := strings.Split(got, "-")[1]
+		if name == "" {
+			t.Fatalf("month %d has no abbreviation", i)
+		}
+		if seen[name] {
+			t.Fatalf("month %d repeats the abbreviation %q", i, name)
+		}
+		seen[name] = true
+		t.Logf("%2d -> %s", i, got)
 	}
 }
 

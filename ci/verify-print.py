@@ -66,6 +66,11 @@ LOANS = [
 # one means either the seed above or the resolution logic changed.
 EXPECT_MARKERS = ["AF", "AN", "AN / AF", "F", "P", "S &amp; P", "---"]
 
+# DATE with the month-names setting on. Both sheets are rendered a second time
+# in that mode because it is the wider date format and the collection sheet's
+# due column is a fixed width.
+EXPECT_MONTH = "Ιούλ"
+
 # Keycards once, combined chart once, then each of the three sections twice.
 EXPECT_PRINT_PAGES = 8
 EXPECT_COLLECT_PAGES = 1     # single sheet, padded to the same 24 ruled rows
@@ -231,6 +236,33 @@ def main():
         for label in ("Κλειδί χρηματοκιβωτίου", "Σίδερο 1", "Σεσουάρ 1"):
             if label not in html:
                 failures.append(f"collection sheet is missing {label!r}")
+
+        # Both sheets again with month names switched on. This is the wider of
+        # the two date formats -- an overdue line reads "26-Ιούλ-26 (+6)" -- and
+        # the due column on the collection sheet is a fixed 3.6cm, so the mode
+        # gets its own render rather than an argument about character counts.
+        print("\n-- month names on")
+        post(url, "/api/settings", {"month_names": True})
+        for path, name, expect in (
+            (f"/print?date={DATE}", "print", EXPECT_PRINT_PAGES),
+            (f"/inventory/print?date={DATE}", "collection", EXPECT_COLLECT_PAGES),
+        ):
+            html, pages = render(
+                url, path, css,
+                os.path.join(args.out, f"{name}-months-{DATE}.pdf"),
+            )
+            print(f"   {name}: {pages} pages (expected {expect})")
+            if pages != expect:
+                failures.append(
+                    f"{name} sheet with month names rendered {pages} pages, "
+                    f"expected {expect} — the longer dates changed the layout"
+                )
+            if EXPECT_MONTH not in html:
+                failures.append(
+                    f"{name} sheet still shows a numeric month with the "
+                    f"setting on — expected {EXPECT_MONTH!r}"
+                )
+        post(url, "/api/settings", {"month_names": False})
     finally:
         proc.kill()
         shutil.rmtree(tmp, ignore_errors=True)

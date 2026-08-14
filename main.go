@@ -103,6 +103,7 @@ func main() {
 	}
 	store = s
 	refreshIconsFromStore()
+	refreshDateFormatFromStore()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleBoard)
@@ -285,6 +286,7 @@ func handleBoard(w http.ResponseWriter, r *http.Request) {
 		data["Keycards"] = len(KeycardsFor(st, d))
 		data["KeycardTracking"] = st.Settings != nil && st.Settings.KeycardTracking
 		data["CustomIcons"] = st.Settings != nil && st.Settings.CustomIcons
+		data["MonthNames"] = st.Settings != nil && st.Settings.MonthNames
 	})
 	render(w, "board.html", data)
 }
@@ -506,6 +508,7 @@ func apiSettings(r *http.Request) (any, error) {
 		// than switching it off.
 		KeycardTracking *bool `json:"keycard_tracking"`
 		CustomIcons     *bool `json:"custom_icons"`
+		MonthNames      *bool `json:"month_names"`
 	}
 	if err := decode(r, &req); err != nil {
 		return nil, err
@@ -520,11 +523,15 @@ func apiSettings(r *http.Request) (any, error) {
 		if req.CustomIcons != nil {
 			st.Settings.CustomIcons = *req.CustomIcons
 		}
+		if req.MonthNames != nil {
+			st.Settings.MonthNames = *req.MonthNames
+		}
 		return nil
 	}); err != nil {
 		return nil, err
 	}
 	refreshIconsFromStore()
+	refreshDateFormatFromStore()
 	return nil, nil
 }
 
@@ -538,6 +545,17 @@ func refreshIconsFromStore() {
 		custom = st.Settings != nil && st.Settings.CustomIcons
 	})
 	RefreshIcons(custom)
+}
+
+// refreshDateFormatFromStore re-reads the date setting, kept separate from
+// RefreshDateFormat for the same reason as the icons above: the formatter never
+// has to know about the Store.
+func refreshDateFormatFromStore() {
+	months := false
+	store.Read(func(st *State) {
+		months = st.Settings != nil && st.Settings.MonthNames
+	})
+	RefreshDateFormat(months)
 }
 
 type iconSlotView struct {

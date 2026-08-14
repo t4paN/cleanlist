@@ -203,6 +203,35 @@ Had it been a plain struct, the keycard check-off would have defaulted off on
 every existing installation purely because `bool` starts `false`. Follow that
 pattern for any setting whose default is not the zero value.
 
+## Dates
+
+Two formats, and they must not be confused:
+
+- **`FormatDate` → `2026-08-14`.** ISO, for storage, the API and every `<input
+  type="date">`. The picker refuses anything else and `ParseDate` reads it back.
+  Not negotiable.
+- **`FormatGreek` → `14-08-26`, or `14-Αύγ-26`** when `Settings.MonthNames` is
+  on. Display only, and the *single* place a date is formatted for a person —
+  board, totals, stays panel, printed sheets, collection sheet, due dates.
+
+Changing how dates look means changing `FormatGreek` and nothing else. If a page
+needs a formatted date, render it in Go and pass it through; do not reformat in
+JavaScript. `/api/room` returns both (`arrival` and `arrival_gr`) for exactly
+this reason, and the board's date picker carries its own rendered value in
+`data-gr` so the confirm dialogs have one to quote.
+
+`dateMode` caches the setting and follows `iconMode`'s rule: templates render
+after the Store lock is released, so the formatter must never reach back into
+the Store. Call `refreshDateFormatFromStore` after anything that changes it.
+
+**The date picker itself cannot be formatted.** `<input type="date">` renders in
+the browser's locale and no CSS or markup overrides it — same class of problem
+as the browser's print headers. Don't try to fix it in code.
+
+The month-name mode is the wider format, so `ci/verify-print.py` renders both
+sheets a second time with it on. The collection sheet's due column is a fixed
+3.6cm and an overdue line reads `26-Ιούλ-26 (+6)`.
+
 ## Inventory
 
 `inventory.go` holds the loanable-items domain: `Item`, `Loan`, and the

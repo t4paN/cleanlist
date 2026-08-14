@@ -19,3 +19,7 @@ icons/
 # Print verification output (see CLAUDE.md, "Verifying print output")
 preview.pdf
 *.png
+
+# Byte-compiled CI helper. Committed once by accident; it changes every run.
+__pycache__/
+*.pyc

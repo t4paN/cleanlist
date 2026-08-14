@@ -26,13 +26,11 @@ function refresh() {
   location.href = '/?date=' + $('date').value;
 }
 
-// Dates are held as ISO everywhere a machine reads them and shown as DD-MM-YY
-// everywhere a person does. Anything the server renders comes back already
-// formatted; this is only for the values sitting in the date pickers.
-function showDate(iso) {
-  const [y, m, d] = String(iso).split('-');
-  return d && m && y ? `${d}-${m}-${y.slice(2)}` : iso;
-}
+// Dates are held as ISO everywhere a machine reads them and shown in the
+// hotel's format everywhere a person does. The formatting is always the
+// server's — the date picker carries the rendered version of its own value in
+// data-gr, and changing the picker reloads the page, so the two never drift.
+const shownDate = () => $('date').dataset.gr || $('date').value;
 
 function paint() {
   rooms().forEach((el) => el.classList.toggle('sel', sel.has(el.dataset.room)));
@@ -148,7 +146,7 @@ $('in-ok').onclick = async () => {
 $('btn-out').onclick = async () => {
   const list = [...sel].sort();
   if (list.length > 3 && !confirm(
-    `Check out ${list.length} rooms on ${showDate($('date').value)}?\n\n${list.join(', ')}`)) return;
+    `Check out ${list.length} rooms on ${shownDate()}?\n\n${list.join(', ')}`)) return;
   try {
     await post('/api/checkout', { rooms: list, date: $('date').value });
     refresh();
@@ -209,6 +207,19 @@ document.querySelectorAll('.kc').forEach((el) => {
     } catch (err) { showErr(err.message); }
   });
 });
+
+// Dates are rendered server-side too — the board, the totals line and the
+// stays panel all carry them — so this reloads rather than repainting.
+$('opt-months').onchange = async (e) => {
+  const on = e.target.checked;
+  try {
+    await post('/api/settings', { month_names: on });
+    location.reload();
+  } catch (err) {
+    e.target.checked = !on;
+    showErr(err.message);
+  }
+};
 
 // Icons are rendered server-side, so this one reloads rather than repainting.
 $('opt-icons').onchange = async (e) => {

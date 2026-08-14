@@ -240,3 +240,34 @@ headers.
 
 `TestDisplayDateFormat` pins both formats, including the leading zeros that keep
 the printed due-date column an even width.
+
+## Month names, as a menu option
+
+The burger menu gained **Month names in dates**. Off, dates read `14-08-26`;
+on, they read `14-Αύγ-26` — on screen and on the printed sheets, since both go
+through `FormatGreek`.
+
+Months are Greek because everything else on the sheet is: Ιαν, Φεβ, Μάρ, Απρ,
+Μάι, Ιούν, Ιούλ, Αύγ, Σεπ, Οκτ, Νοέ, Δεκ. June and July carry four letters so
+they cannot be mistaken for each other.
+
+`Settings.MonthNames` is additive and **off is the zero value**, so a data file
+written by any previous build keeps the numeric dates it already had. No
+migration.
+
+`dateMode` in `rules.go` caches the setting rather than reading the Store, for
+the same reason `iconMode` does: templates render after the Store lock is
+released and a formatter that took it again would deadlock. `RefreshDateFormat`
+is called at startup and after a settings change.
+
+The JS date formatter added in the previous change is gone. The board's date
+picker now carries its own rendered date in `data-gr`, so the Check Out confirm
+quotes the server's formatting instead of duplicating it — one formatter, per
+invariant 5.
+
+**`ci/verify-print.py` now renders both sheets twice**, once per date format.
+Month names are the wider of the two — an overdue collection line reads
+`26-Ιούλ-26 (+6)` against a fixed 3.6cm due column — so the mode is verified by
+rendering rather than by counting characters. The extra PDFs land in the
+`printed-sheets-pdf` artifact as `print-months-*.pdf` and
+`collection-months-*.pdf`.
