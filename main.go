@@ -899,9 +899,12 @@ func handleCollectionPrint(w http.ResponseWriter, r *http.Request) {
 	d := queryDate(r)
 	data := map[string]any{"DateGr": FormatGreek(d)}
 	store.Read(func(st *State) {
-		items := Collections(st, d)
-		data["Items"] = items
-		data["Blanks"] = padTo(len(items))
+		// Neither table on this sheet is padded to the 24-row grid. The blank
+		// rules on the cleaning sheets are writing space for a housekeeper
+		// walking a corridor; here they would only be rows for items nobody
+		// has out and rooms that owe nothing, and they would push the unpaid
+		// table onto a page of its own however short both lists were.
+		data["Items"] = Collections(st, d)
 		// The unpaid list is its own page and only exists when something is
 		// owed, so a day where everyone has paid still prints one sheet.
 		//

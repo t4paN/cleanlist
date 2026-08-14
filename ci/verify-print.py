@@ -74,11 +74,12 @@ EXPECT_MONTH = "Ιούλ"
 # Keycards once, combined chart once, then each of the three sections twice.
 EXPECT_PRINT_PAGES = 8
 
-# Stays seed as unpaid, so the collection print carries its unpaid page too.
-# Once everything is marked paid that page goes away and the sheet is a single
-# padded page again — both are checked, because "no unpaid rooms" is the state
-# the hotel should mostly be in and it must not print a blank second sheet.
-EXPECT_COLLECT_PAGES = 2
+# Neither table on the collection sheet is padded, and the unpaid one rides
+# under the collection list rather than claiming a page, so the seeded day fits
+# on one sheet. It flows onto a second page only when the two lists together are
+# genuinely long. Both states are checked: with rooms owing and with none, the
+# count must stay 1 here, or something has started padding again.
+EXPECT_COLLECT_PAGES = 1
 EXPECT_COLLECT_PAID_PAGES = 1
 
 # Every room with a guest in it on DATE, in printed order.

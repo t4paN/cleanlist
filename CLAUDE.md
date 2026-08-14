@@ -341,16 +341,31 @@ that can drift apart.
 ## Print output
 
 The cleaning sheet is eight pages: the keycard list once, the combined chart
-once, then each of the three sections twice. The collection sheet at
-`/inventory/print` is one page, padded to the same 24 ruled rows, plus a second
-**unpaid rooms** page when anything is owed — that page is conditional, so a day
-with nothing outstanding still prints a single sheet rather than a page of empty
-rules. Both copies of a section are deliberately identical — housekeepers split
-the floors between themselves, so do not try to divide the rooms between the
-copies.
+once, then each of the three sections twice. Both copies of a section are
+deliberately identical — housekeepers split the floors between themselves, so do
+not try to divide the rooms between the copies.
+
+The collection sheet at `/inventory/print` is usually one page holding two
+tables: what to collect, then **unpaid rooms** when anything is owed. Neither is
+padded, and that is the point — see below.
 
 Pages come from `.sheet` divs: `break-before: page` on each, `auto` on the
-first. Adding a page means adding a `.sheet`, not fiddling with the padding.
+first, and `auto` again on `.sheet-join`, which rides under the sheet above
+instead of claiming a page of its own. The two collection tables therefore share
+a page and only spill onto a second when they are genuinely long, at which point
+`thead { display: table-header-group }` reprints the headings on the
+continuation.
+
+### What gets padded, and what does not
+
+`padTo` fills a short table out to 24 ruled rows. It applies to the **cleaning
+sheets and the keycard list** because those blank rules are writing space for
+someone standing in a corridor with a pen.
+
+It deliberately does **not** apply to either table on the collection sheet.
+There the blank rows would be lines for items nobody has out and rooms that owe
+nothing — and worse, a padded first table pushes the unpaid one onto a page of
+its own however short both lists are. Do not "restore consistency" here.
 
 - Combined chart: six columns, room + marker for each of the three sections. No
   notes column.

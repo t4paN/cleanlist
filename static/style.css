@@ -136,6 +136,9 @@ a { color: var(--accent); }
   box-shadow: 0 0 7px 1px rgba(192, 57, 43, 0.55);
   position: relative;
   z-index: 1;
+  /* A gap so a run of unpaid rooms reads as several rooms rather than one red
+     block. Vertical margins collapse, so neighbours share the 3px. */
+  margin: 3px 0;
 }
 
 /* Selection keeps its bar; the two shadows have to be declared together
@@ -584,4 +587,15 @@ table.list.collect .c-note { width: auto; }
   tr { break-inside: avoid; }
   .sheet { break-before: page; padding: 0; }
   .sheet:first-of-type { break-before: auto; }
+
+  /* A joined sheet rides under the one above instead of claiming a page. It
+     moves to the next page only when the two together do not fit, which the
+     browser works out — neither table is padded, so short lists share a page.
+     thead is a header-group above, so a table that does split reprints its
+     headings. */
+  .sheet.sheet-join { break-before: auto; margin-top: 8mm; }
 }
+
+/* On screen the joined table needs the same separation the print margin gives
+   it, or the two run together. */
+.sheet.sheet-join { margin-top: 16px; }

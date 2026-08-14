@@ -42,20 +42,12 @@
         <td class="c-note">&nbsp;</td>
       </tr>
       {{end}}
-      {{range .Blanks}}
-      <tr>
-        <td class="c-room">&nbsp;</td>
-        <td class="c-item">&nbsp;</td>
-        <td class="c-due">&nbsp;</td>
-        <td class="c-note">&nbsp;</td>
-      </tr>
-      {{end}}
     </tbody>
   </table>
 </div>
 
 {{if .Unpaid}}
-<div class="sheet">
+<div class="sheet sheet-join">
   <table class="list collect">
     <colgroup>
       <col class="c-room"><col class="c-item"><col class="c-due"><col class="c-note">

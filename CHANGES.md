@@ -324,3 +324,32 @@ migration — but it should be a decision someone makes out loud.
 
 **The collection sheet is now two pages when anything is owed** and one page when
 nothing is. `ci/verify-print.py` checks both states.
+
+## Collection sheet: two tables, one page
+
+Follow-up to the above, after looking at a rendered sheet.
+
+**Neither table is padded now.** The unpaid table lost its blank rows first;
+the collection table has now lost them too, because a first table padded to 24
+rows pushes the second onto a page of its own however short both lists are.
+Blank ruled rows are writing space for a housekeeper walking a corridor — that
+is why the cleaning sheets and the keycard list keep theirs — but this sheet is
+read at a desk.
+
+**The unpaid table rides under the collection list** rather than starting a
+page. `.sheet-join` overrides `break-before` back to `auto`. The two share a
+page and spill onto a second only when they are genuinely long, and because
+`thead` is a header group the continued table reprints its headings.
+
+Measured on a Chrome render of a seeded mid-August day — 4 items out, 10 rooms
+owing: one page. Growing the collection list to 20 rows moves the unpaid table
+over; at 12 rows it still shares. Chrome rather than weasyprint here, so this is
+the same engine the reception PC prints with.
+
+**The board gained a 3px gap around unpaid rooms.** A run of them was reading as
+one red block rather than four separate rooms; margins collapse, so neighbours
+share the gap.
+
+`EXPECT_COLLECT_PAGES` in `ci/verify-print.py` drops back to 1 and now guards
+the opposite failure: if something starts padding these tables again, the
+seeded day grows a second page and the check fails.
