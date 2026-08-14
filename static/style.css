@@ -273,6 +273,10 @@ table.stays th, table.stays td {
 }
 table.stays th { color: var(--dim); font-weight: 600; font-size: 12px; }
 
+/* The stay covering the date on screen. Bold rather than coloured — the panel
+   is read at a glance and weight survives a bad monitor. */
+table.stays tr.now td { font-weight: 700; }
+
 /* ---------- Category editor ---------- */
 
 .cat-card {

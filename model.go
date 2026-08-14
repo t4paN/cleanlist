@@ -530,18 +530,24 @@ func AddStay(st *State, room string, s Stay) error {
 	return nil
 }
 
+// CoversDate reports whether s spans d, counting the arrival and departure days
+// as covered. Day ordinals, not Duration — see DayNum.
+func CoversDate(s *Stay, d time.Time) bool {
+	a, err1 := ParseDate(s.Arrival)
+	b, err2 := ParseDate(s.Departure)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	dn := DayNum(d)
+	return dn >= DayNum(a) && dn <= DayNum(b)
+}
+
 // CurrentStay returns the stay covering d, counting arrival and departure days
 // as covered. Used by the Check Out action.
 func CurrentStay(st *State, room string, d time.Time) *Stay {
-	dn := DayNum(d)
 	for i := range st.Stays[room] {
 		s := &st.Stays[room][i]
-		a, err1 := ParseDate(s.Arrival)
-		b, err2 := ParseDate(s.Departure)
-		if err1 != nil || err2 != nil {
-			continue
-		}
-		if dn >= DayNum(a) && dn <= DayNum(b) {
+		if CoversDate(s, d) {
 			return s
 		}
 	}

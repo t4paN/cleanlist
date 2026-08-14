@@ -169,3 +169,45 @@ on the cleaning board — but `/inventory` itself is unchanged.
   `../claude-checklist.md`, outside the repo. **Rotate it.**
 - Print layout is still tuned empirically. Weasyprint catches page counts and
   gross column errors; the hotel's actual printer has the final say.
+
+---
+
+# Changes — session of 2026-08-14
+
+## Stays panel: current booking first, in bold
+
+Selecting a single room opens the Stays panel under the board. It listed a
+room's stays oldest first, so on a room with any history the guest actually in
+there was at the bottom of the list. It now reads top-down:
+
+1. Any stay covering the date the board is showing, in **bold**.
+2. Everything else, newest arrival first.
+
+Two details worth knowing:
+
+- **It is not a plain reverse sort.** A pure newest-first order puts a booking
+  taken for next month above the guest currently in the room, which is the
+  opposite of what the panel is read for. The covering stay is pinned to the
+  top and the rest run newest-first below it.
+- **On a turnover day both stays are current** and both are bold — the arrival
+  and departure days each count as covered, same as everywhere else — with the
+  incoming stay on top.
+
+The panel follows the date picker, not the wall clock: move the board to a date
+next week and the panel bolds whoever is in the room *then*.
+
+`CoversDate` in `model.go` is the one definition of "covering", factored out of
+`CurrentStay` so the panel and the Check Out action cannot drift apart. It uses
+`DayNum`, per invariant 1.
+
+Ordering happens in Go (`RoomStays` in `main.go`), not in `board.js`. `/api/room`
+now takes a `date` parameter and returns a `current` flag per stay; the page just
+paints `tr.now` and the CSS bolds it.
+
+**The stored order is unchanged** — `State.Stays` stays sorted ascending by
+arrival, which is what the overlap check and `Resolve` read.
+`TestInsertionOrderIrrelevant` still pins that, and `roomstays_test.go` covers
+the new display order.
+
+**No data migration.** Nothing serialised changed shape; `roomStay` is a view
+type that exists only in the API response.

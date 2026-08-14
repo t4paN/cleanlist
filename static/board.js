@@ -54,8 +54,11 @@ function clickRoom(e, el) {
   paint();
 }
 
+// The server orders these — current stay first, then newest arrival down — and
+// says which one is current, so the panel matches the date the board is showing.
 async function loadDetail(room) {
-  const r = await fetch('/api/room?room=' + encodeURIComponent(room));
+  const r = await fetch('/api/room?room=' + encodeURIComponent(room)
+    + '&date=' + encodeURIComponent($('date').value));
   const { stays, labels } = await r.json();
   $('detail-room').textContent = room;
   const body = $('detail-body');
@@ -65,6 +68,7 @@ async function loadDetail(room) {
   }
   stays.forEach((s) => {
     const tr = document.createElement('tr');
+    if (s.current) tr.className = 'now';
     [labels[s.category] || s.category, s.arrival, s.departure].forEach((v) => {
       const td = document.createElement('td');
       td.textContent = v;

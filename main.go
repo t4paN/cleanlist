@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -688,12 +689,48 @@ func apiPreview(r *http.Request) (any, error) {
 	return map[string]any{"long": long, "short": short}, nil
 }
 
+// roomStay is a Stay dressed for the detail panel: the same fields plus whether
+// it covers the date the board is showing. The flag is worked out here rather
+// than in the page so there is one definition of "current", shared with the
+// Check Out action.
+type roomStay struct {
+	Stay
+	Current bool `json:"current"`
+}
+
+// RoomStays lists a room's stays for the detail panel, newest arrival first,
+// with anything covering d pinned above that. Reception reads this panel to
+// answer "who is in there now", so the answer belongs on the first line; a
+// booking taken for next month must not push it down. On a turnover day both
+// the outgoing and the incoming stay cover the date and both are marked, the
+// incoming one first.
+//
+// The stored order is untouched — it stays ascending by arrival, which is what
+// the overlap check and Resolve read.
+func RoomStays(st *State, room string, d time.Time) []roomStay {
+	out := []roomStay{}
+	for _, s := range st.Stays[room] {
+		out = append(out, roomStay{Stay: s, Current: CoversDate(&s, d)})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Current != out[j].Current {
+			return out[i].Current
+		}
+		if out[i].Arrival != out[j].Arrival {
+			return out[i].Arrival > out[j].Arrival
+		}
+		return out[i].Departure > out[j].Departure
+	})
+	return out
+}
+
 func apiRoom(w http.ResponseWriter, r *http.Request) {
 	room := r.URL.Query().Get("room")
-	out := []Stay{}
+	d := queryDate(r)
+	var out []roomStay
 	labels := map[string]string{}
 	store.Read(func(st *State) {
-		out = append(out, st.Stays[room]...)
+		out = RoomStays(st, room, d)
 		for _, c := range st.Categories {
 			labels[c.ID] = c.Label
 		}
