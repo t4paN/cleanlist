@@ -904,9 +904,13 @@ func handleCollectionPrint(w http.ResponseWriter, r *http.Request) {
 		data["Blanks"] = padTo(len(items))
 		// The unpaid list is its own page and only exists when something is
 		// owed, so a day where everyone has paid still prints one sheet.
-		unpaid := unpaidRows(st, d)
-		data["Unpaid"] = unpaid
-		data["UnpaidBlanks"] = padTo(len(unpaid))
+		//
+		// Deliberately not padded to the 24-row grid the other sheets use. Those
+		// blank rules are writing space for a housekeeper walking a corridor;
+		// here they would be rows for rooms that owe nothing, and a debt list
+		// that runs to a full page whether one room owes or fifteen do is a list
+		// nobody can read at a glance.
+		data["Unpaid"] = unpaidRows(st, d)
 	})
 	render(w, "collect.html", data)
 }
