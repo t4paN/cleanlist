@@ -67,6 +67,47 @@ func TestRoomStaysEmpty(t *testing.T) {
 	}
 }
 
+// Dates are shown to people as DD-MM-YY and stored as ISO. Both halves matter:
+// the date pickers and the API only accept ISO, so a display format leaking
+// into FormatDate would break check-in.
+func TestDisplayDateFormat(t *testing.T) {
+	d := mustDate(t, "2026-08-14")
+	if got := FormatGreek(d); got != "14-08-26" {
+		t.Fatalf("display format: got %q, want %q", got, "14-08-26")
+	}
+	if got := FormatDate(d); got != "2026-08-14" {
+		t.Fatalf("stored format changed: got %q, want %q", got, "2026-08-14")
+	}
+	// Single-digit days and months keep their leading zero, so the column
+	// stays the same width on the printed sheet.
+	if got := FormatGreek(mustDate(t, "2026-01-05")); got != "05-01-26" {
+		t.Fatalf("leading zeros: got %q, want %q", got, "05-01-26")
+	}
+}
+
+// The panel carries both: formatted dates to show, ISO to send back.
+func TestRoomStaysCarryDisplayDates(t *testing.T) {
+	st := seedState()
+	if err := AddStay(st, "210", Stay{Category: "booking", Arrival: "2026-08-10", Departure: "2026-08-18"}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	got := RoomStays(st, "210", mustDate(t, "2026-08-14"))[0]
+	if got.ArrivalGr != "10-08-26" || got.DepartureGr != "18-08-26" {
+		t.Fatalf("display dates: got %q → %q", got.ArrivalGr, got.DepartureGr)
+	}
+	if got.Arrival != "2026-08-10" || got.Departure != "2026-08-18" {
+		t.Fatalf("ISO dates must survive for the delete call: %q → %q", got.Arrival, got.Departure)
+	}
+}
+
+// A date that will not parse shows as stored rather than as a blank. An
+// unreadable date is a data problem worth seeing.
+func TestDisplayDateFallsBackToStored(t *testing.T) {
+	if got := displayDate("not-a-date"); got != "not-a-date" {
+		t.Fatalf("got %q, want the stored text back", got)
+	}
+}
+
 func arrivals(list []roomStay) []string {
 	out := []string{}
 	for _, s := range list {

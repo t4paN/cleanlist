@@ -26,6 +26,14 @@ function refresh() {
   location.href = '/?date=' + $('date').value;
 }
 
+// Dates are held as ISO everywhere a machine reads them and shown as DD-MM-YY
+// everywhere a person does. Anything the server renders comes back already
+// formatted; this is only for the values sitting in the date pickers.
+function showDate(iso) {
+  const [y, m, d] = String(iso).split('-');
+  return d && m && y ? `${d}-${m}-${y.slice(2)}` : iso;
+}
+
 function paint() {
   rooms().forEach((el) => el.classList.toggle('sel', sel.has(el.dataset.room)));
   const n = sel.size;
@@ -69,7 +77,7 @@ async function loadDetail(room) {
   stays.forEach((s) => {
     const tr = document.createElement('tr');
     if (s.current) tr.className = 'now';
-    [labels[s.category] || s.category, s.arrival, s.departure].forEach((v) => {
+    [labels[s.category] || s.category, s.arrival_gr, s.departure_gr].forEach((v) => {
       const td = document.createElement('td');
       td.textContent = v;
       tr.appendChild(td);
@@ -79,7 +87,7 @@ async function loadDetail(room) {
     b.className = 'danger';
     b.textContent = 'Remove';
     b.onclick = async () => {
-      if (!confirm(`Remove the stay ${s.arrival} → ${s.departure} in room ${room}?`)) return;
+      if (!confirm(`Remove the stay ${s.arrival_gr} → ${s.departure_gr} in room ${room}?`)) return;
       try {
         await post('/api/stay/delete', { room, id: s.id });
         refresh();
@@ -140,7 +148,7 @@ $('in-ok').onclick = async () => {
 $('btn-out').onclick = async () => {
   const list = [...sel].sort();
   if (list.length > 3 && !confirm(
-    `Check out ${list.length} rooms on ${$('date').value}?\n\n${list.join(', ')}`)) return;
+    `Check out ${list.length} rooms on ${showDate($('date').value)}?\n\n${list.join(', ')}`)) return;
   try {
     await post('/api/checkout', { rooms: list, date: $('date').value });
     refresh();

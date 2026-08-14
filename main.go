@@ -689,13 +689,30 @@ func apiPreview(r *http.Request) (any, error) {
 	return map[string]any{"long": long, "short": short}, nil
 }
 
-// roomStay is a Stay dressed for the detail panel: the same fields plus whether
-// it covers the date the board is showing. The flag is worked out here rather
-// than in the page so there is one definition of "current", shared with the
-// Check Out action.
+// roomStay is a Stay dressed for the detail panel: the same fields, whether it
+// covers the date the board is showing, and its dates written the way they are
+// displayed. The flag is worked out here rather than in the page so there is
+// one definition of "current", shared with the Check Out action; the dates come
+// through FormatGreek for the same reason.
+//
+// The raw ISO arrival and departure stay in the response — the page sends them
+// back when deleting a stay.
 type roomStay struct {
 	Stay
-	Current bool `json:"current"`
+	Current     bool   `json:"current"`
+	ArrivalGr   string `json:"arrival_gr"`
+	DepartureGr string `json:"departure_gr"`
+}
+
+// displayDate renders an ISO date the way the rest of the app shows dates,
+// falling back to the stored text if it will not parse. A date that cannot be
+// read is a data problem worth seeing, not worth hiding behind a blank.
+func displayDate(iso string) string {
+	d, err := ParseDate(iso)
+	if err != nil {
+		return iso
+	}
+	return FormatGreek(d)
 }
 
 // RoomStays lists a room's stays for the detail panel, newest arrival first,
@@ -710,7 +727,12 @@ type roomStay struct {
 func RoomStays(st *State, room string, d time.Time) []roomStay {
 	out := []roomStay{}
 	for _, s := range st.Stays[room] {
-		out = append(out, roomStay{Stay: s, Current: CoversDate(&s, d)})
+		out = append(out, roomStay{
+			Stay:        s,
+			Current:     CoversDate(&s, d),
+			ArrivalGr:   displayDate(s.Arrival),
+			DepartureGr: displayDate(s.Departure),
+		})
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Current != out[j].Current {

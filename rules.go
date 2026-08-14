@@ -12,8 +12,15 @@ func ParseDate(s string) (time.Time, error) {
 
 func FormatDate(t time.Time) string { return t.Format("2006-01-02") }
 
-// FormatGreek renders DD/MM/YYYY for the printed sheet.
-func FormatGreek(t time.Time) string { return t.Format("02/01/2006") }
+// FormatGreek renders DD-MM-YY, the way the hotel writes a date by hand. This
+// is the only date format shown to a person — the board, the sheets, the
+// collection list and the due dates all come through here, so changing it here
+// changes it everywhere.
+//
+// It is display only. Dates are stored, sent to the API and put in <input
+// type="date"> as ISO YYYY-MM-DD via FormatDate, and that must not change: the
+// date picker refuses anything else and the day arithmetic parses it.
+func FormatGreek(t time.Time) string { return t.Format("02-01-06") }
 
 // DayNum converts a time to a whole-day ordinal built from its calendar
 // components, deliberately re-anchored in UTC.

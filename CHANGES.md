@@ -211,3 +211,32 @@ the new display order.
 
 **No data migration.** Nothing serialised changed shape; `roomStay` is a view
 type that exists only in the API response.
+
+## Dates read DD-MM-YY
+
+Every date shown to a person is now written `14-08-26`. Previously the display
+format was `14/08/2026` and the Stays panel showed the raw stored `2026-08-14`,
+so the app had two visible formats and neither matched how the hotel writes a
+date by hand.
+
+`FormatGreek` in `rules.go` is the single place this is decided — the board, the
+totals line, the printed sheets, the collection sheet, the inventory list and
+every due date all render through it.
+
+**Display only. Nothing stored changed.** Dates are still held, sent to the API
+and put into `<input type="date">` as ISO `YYYY-MM-DD` through `FormatDate`, and
+that cannot change: the date picker refuses any other format and the day
+arithmetic parses it. `/api/room` now returns both — `arrival_gr` to show,
+`arrival` to send back when deleting a stay — and the sort still runs on the ISO
+field, where lexical order is chronological order.
+
+The two `confirm()` dialogs on the board were showing ISO dates at people and
+now show the display format as well.
+
+**The date picker itself is not ours to format.** `<input type="date">` renders
+in the browser's own locale — on a Greek Windows box it reads `14/08/2026` — and
+no CSS or markup can override it. Same class of problem as the browser's print
+headers.
+
+`TestDisplayDateFormat` pins both formats, including the leading zeros that keep
+the printed due-date column an even width.
