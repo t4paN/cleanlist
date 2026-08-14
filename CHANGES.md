@@ -172,184 +172,181 @@ on the cleaning board — but `/inventory` itself is unchanged.
 
 ---
 
-# Changes — session of 2026-08-14
+# Changes — session of 2026-08-14 — v1.2.0
 
-## Stays panel: current booking first, in bold
+Second session on top of v1.1.0. Read [CLAUDE.md](CLAUDE.md) for the invariants;
+this records what moved and why.
+
+## Summary
+
+Four things, in the order they were asked for:
+
+1. **The Stays panel reads current-first**, in bold, instead of oldest-first.
+2. **Dates are written the way the hotel writes them** — `14-08-26`, or
+   `14-Αύγ-26` with a new menu option.
+3. **Payment tracking**: unpaid rooms glow red on the board, a Paid button on
+   the toolbar, and an unpaid list on the collection printout.
+4. **The collection sheet lost its blank rows** so both its tables share a page.
+
+Everything was compiled and tested in CI. The print layout was additionally
+rendered locally through **Chrome** rather than weasyprint — the same engine the
+reception PC prints with — and measured rather than eyeballed.
+
+## Upgrading
+
+**Read this before dropping the binary on the reception PC.**
+
+There is no migration and nothing serialised changed shape. `Stay.Paid` and
+`Settings.MonthNames` are both additive and both decode correctly from a file
+written by v1.1.0. Drop the new `cleanlist.exe` in beside the existing
+`cleanlist-data.json` and every stay, loan and setting carries over.
+
+One visible consequence, chosen deliberately:
+
+**Every existing stay reads as unpaid.** Unpaid is the zero value, and it is the
+only honest default — a stay written by the previous build is one nobody has
+confirmed payment for. So on the first run the board shows a red outline on
+every room with a guest in it, and the collection sheet lists them all.
+Reception clears it by selecting the rooms that have paid and pressing Paid
+once. A few minutes on the first day, accurate from then on.
+
+The alternative — a migration marking every existing stay paid — asserts money
+was received when nothing in the system knows whether it was, and wrong data
+must never look like normal data. If the hotel would rather start from a clean
+slate anyway, it is a five-line migration, but it should be a decision someone
+makes out loud rather than something that happens quietly.
+
+Copy the data file aside first regardless. It is still the only copy of live
+occupancy apart from the daily backups.
+
+---
+
+## Stays panel reads current-first
 
 Selecting a single room opens the Stays panel under the board. It listed a
 room's stays oldest first, so on a room with any history the guest actually in
-there was at the bottom of the list. It now reads top-down:
+there was at the bottom. It now opens with the stay covering the date on screen,
+in **bold**, then everything else newest-arrival-first.
 
-1. Any stay covering the date the board is showing, in **bold**.
-2. Everything else, newest arrival first.
-
-Two details worth knowing:
-
-- **It is not a plain reverse sort.** A pure newest-first order puts a booking
-  taken for next month above the guest currently in the room, which is the
-  opposite of what the panel is read for. The covering stay is pinned to the
-  top and the rest run newest-first below it.
-- **On a turnover day both stays are current** and both are bold — the arrival
-  and departure days each count as covered, same as everywhere else — with the
-  incoming stay on top.
-
-The panel follows the date picker, not the wall clock: move the board to a date
-next week and the panel bolds whoever is in the room *then*.
+- **Not a plain reverse sort.** Newest-first alone puts a booking taken for next
+  month above the guest currently in the room, which is the opposite of what the
+  panel is read for. The covering stay is pinned to the top and the rest follow.
+- **On a turnover day both stays cover the date**, so both are bold, incoming
+  on top.
+- **It follows the date picker, not the wall clock.** Move the board to next
+  week and the panel bolds whoever is in the room *then*.
 
 `CoversDate` in `model.go` is the one definition of "covering", factored out of
 `CurrentStay` so the panel and the Check Out action cannot drift apart. It uses
-`DayNum`, per invariant 1.
+`DayNum`, per invariant 1. Ordering happens in `RoomStays` in Go, not in
+`board.js`; `/api/room` takes a `date` and returns a `current` flag per stay.
 
-Ordering happens in Go (`RoomStays` in `main.go`), not in `board.js`. `/api/room`
-now takes a `date` parameter and returns a `current` flag per stay; the page just
-paints `tr.now` and the CSS bolds it.
+**The stored order is untouched** — `State.Stays` stays ascending by arrival,
+which is what the overlap check and `Resolve` read. `TestInsertionOrderIrrelevant`
+still pins that.
 
-**The stored order is unchanged** — `State.Stays` stays sorted ascending by
-arrival, which is what the overlap check and `Resolve` read.
-`TestInsertionOrderIrrelevant` still pins that, and `roomstays_test.go` covers
-the new display order.
+## Dates
 
-**No data migration.** Nothing serialised changed shape; `roomStay` is a view
-type that exists only in the API response.
+Two formats now, and they must not be confused:
 
-## Dates read DD-MM-YY
+| | |
+|---|---|
+| `FormatDate` → `2026-08-14` | ISO. Storage, the API, every `<input type="date">`. |
+| `FormatGreek` → `14-08-26` | Display only. The single place a date is formatted for a person. |
 
-Every date shown to a person is now written `14-08-26`. Previously the display
-format was `14/08/2026` and the Stays panel showed the raw stored `2026-08-14`,
-so the app had two visible formats and neither matched how the hotel writes a
-date by hand.
+Previously the display format was `14/08/2026` and the Stays panel showed the
+raw stored `2026-08-14`, so there were two visible formats and neither matched
+how the hotel writes a date by hand.
 
-`FormatGreek` in `rules.go` is the single place this is decided — the board, the
-totals line, the printed sheets, the collection sheet, the inventory list and
-every due date all render through it.
+**A menu option writes the month out**: `14-Αύγ-26`, on screen and on the
+printed sheets alike. Greek months, because everything else on the sheet is —
+Ιαν, Φεβ, Μάρ, Απρ, Μάι, Ιούν, Ιούλ, Αύγ, Σεπ, Οκτ, Νοέ, Δεκ. June and July
+carry four letters so they cannot be taken for one another. Off is the default
+and the zero value, so an existing file keeps its numeric dates.
 
-**Display only. Nothing stored changed.** Dates are still held, sent to the API
-and put into `<input type="date">` as ISO `YYYY-MM-DD` through `FormatDate`, and
-that cannot change: the date picker refuses any other format and the day
-arithmetic parses it. `/api/room` now returns both — `arrival_gr` to show,
-`arrival` to send back when deleting a stay — and the sort still runs on the ISO
-field, where lexical order is chronological order.
-
-The two `confirm()` dialogs on the board were showing ISO dates at people and
-now show the display format as well.
+`dateMode` caches the setting rather than reading the Store, for the same reason
+`iconMode` does: templates render after the lock is released and a formatter
+that took it again would deadlock.
 
 **The date picker itself is not ours to format.** `<input type="date">` renders
-in the browser's own locale — on a Greek Windows box it reads `14/08/2026` — and
-no CSS or markup can override it. Same class of problem as the browser's print
-headers.
-
-`TestDisplayDateFormat` pins both formats, including the leading zeros that keep
-the printed due-date column an even width.
-
-## Month names, as a menu option
-
-The burger menu gained **Month names in dates**. Off, dates read `14-08-26`;
-on, they read `14-Αύγ-26` — on screen and on the printed sheets, since both go
-through `FormatGreek`.
-
-Months are Greek because everything else on the sheet is: Ιαν, Φεβ, Μάρ, Απρ,
-Μάι, Ιούν, Ιούλ, Αύγ, Σεπ, Οκτ, Νοέ, Δεκ. June and July carry four letters so
-they cannot be mistaken for each other.
-
-`Settings.MonthNames` is additive and **off is the zero value**, so a data file
-written by any previous build keeps the numeric dates it already had. No
-migration.
-
-`dateMode` in `rules.go` caches the setting rather than reading the Store, for
-the same reason `iconMode` does: templates render after the Store lock is
-released and a formatter that took it again would deadlock. `RefreshDateFormat`
-is called at startup and after a settings change.
-
-The JS date formatter added in the previous change is gone. The board's date
-picker now carries its own rendered date in `data-gr`, so the Check Out confirm
-quotes the server's formatting instead of duplicating it — one formatter, per
-invariant 5.
-
-**`ci/verify-print.py` now renders both sheets twice**, once per date format.
-Month names are the wider of the two — an overdue collection line reads
-`26-Ιούλ-26 (+6)` against a fixed 3.6cm due column — so the mode is verified by
-rendering rather than by counting characters. The extra PDFs land in the
-`printed-sheets-pdf` artifact as `print-months-*.pdf` and
-`collection-months-*.pdf`.
+in the browser's locale and no CSS or markup overrides it. Same class of problem
+as the browser's print headers — do not try to fix it in code.
 
 ## Payment tracking
 
-Three parts, all driven off one new field.
+`Stay.Paid` records that reception has taken the money. It hangs off the **stay,
+not the room**: a room is not paid, a guest is, and per-room the next arrival
+inherits the last guest's settled bill.
 
-**`Stay.Paid`.** Payment belongs to the stay, not the room — hang it off the
-room and the next arrival inherits the last guest's settled bill. Additive, and
-unpaid is the zero value.
+**On the board**, a room with a guest in it whose stay is unpaid gets a red
+outline, a halo, and a red dot by the room number for anyone who cannot pick the
+colour out of the stripes. Vacant rooms never glow. Deliberately not animated:
+this sits on a reception screen all day, and a board that pulses is a board
+people stop looking at. A 3px gap keeps a run of unpaid rooms reading as several
+rooms rather than one red block.
 
-**Red on the board.** A room with a guest in it whose stay is unpaid gets a red
-outline and a halo, plus a small red dot by the room number for anyone who
-cannot pick the colour out of the stripes. Vacant rooms never glow. It is
-deliberately not animated: this sits on a reception screen all day, and a board
-that pulses is a board people stop looking at.
+**A Paid button** sits between Check Out and Clear. It lights up only for
+selected rooms that actually have a guest, and always confirms — "Confirm room
+210 has been paid in full." — however few rooms are selected, because money is
+the one thing on this board nobody can verify by looking at the room.
 
-**A Paid button**, between Check Out and Clear. It lights up only for selected
-rooms that actually have a guest, and always confirms — "Confirm room 210 has
-been paid in full." — however few rooms are selected, because money is the one
-thing on this board nobody can verify by looking at the room.
+Two things past the literal request, both because the alternative loses money:
 
-Two things beyond the literal request, both because the alternative loses money:
-
-- **The button reverses.** When everything selected is already settled it reads
-  "Not paid" and asks "Mark room 210 as NOT paid?". A one-way flag means a
-  mis-click quietly writes off a real debt with no way back.
+- **The button reverses.** Once everything selected is settled it reads "Not
+  paid" and asks to unmark. A one-way flag means one mis-click quietly writes
+  off a real debt.
 - **A selection containing a vacant room is refused whole**, naming the rooms,
-  rather than marking the occupied ones and silently skipping the rest.
+  rather than marking some and skipping the rest silently.
 
-**An unpaid page on the collection printout**, listing room, category and
-departure date in printed room order. Departure is what makes it actionable: a
-guest leaving tomorrow who has not paid is a different problem from one staying
-another week.
+`UnpaidOn` asks whether **any** covering stay is unpaid, so on a turnover day
+either guest owing shows and a debt cannot hide behind the other's settled bill.
+`SetPaid` marks every covering stay, so one press settles the day.
 
-## Upgrading to this build
+`/api/paid` runs on `MutateNoUndo`, like the keycard tick: undo holds one step,
+it protects stay data from a mis-selected Check Out, and a bookkeeping gesture
+must not spend it.
 
-**Read this one.** There is no data migration and nothing changes shape, but
-there is a visible consequence the first morning.
+## Collection sheet
 
-Every stay in the existing data file decodes as **unpaid**, because that is the
-zero value and nobody has said otherwise. So on first run the board shows a red
-outline on every room with a guest in it, and the collection sheet prints an
-unpaid page listing them all. Reception clears it by selecting the rooms that
-have paid and pressing Paid once — it is a few minutes on the first day and
-accurate from then on.
+The printout gained an **unpaid rooms** table — room, category, departure date,
+in printed room order. Departure is what makes it actionable: a guest leaving
+tomorrow who has not paid is a different problem from one staying another week.
 
-This was a choice, not an oversight. The alternative is a migration marking
-every existing stay paid, which asserts money was received when nothing in the
-system knows whether it was. Wrong data must never look like normal data. If the
-hotel would rather start from a clean slate anyway, say so and it is a five-line
-migration — but it should be a decision someone makes out loud.
+**Neither table on this sheet is padded**, and that took two passes to get
+right. Blank ruled rows are writing space for a housekeeper walking a corridor,
+which is why the cleaning sheets and the keycard list keep theirs. Here they
+were rows for items nobody has out and rooms that owe nothing — and a first
+table padded to 24 rows pushes the second onto a page of its own however short
+both lists are.
 
-**The collection sheet is now two pages when anything is owed** and one page when
-nothing is. `ci/verify-print.py` checks both states.
-
-## Collection sheet: two tables, one page
-
-Follow-up to the above, after looking at a rendered sheet.
-
-**Neither table is padded now.** The unpaid table lost its blank rows first;
-the collection table has now lost them too, because a first table padded to 24
-rows pushes the second onto a page of its own however short both lists are.
-Blank ruled rows are writing space for a housekeeper walking a corridor — that
-is why the cleaning sheets and the keycard list keep theirs — but this sheet is
-read at a desk.
-
-**The unpaid table rides under the collection list** rather than starting a
-page. `.sheet-join` overrides `break-before` back to `auto`. The two share a
-page and spill onto a second only when they are genuinely long, and because
-`thead` is a header group the continued table reprints its headings.
+`.sheet-join` overrides `break-before` back to `auto`, so the unpaid table rides
+under the collection list. The two share a page and spill onto a second only
+when genuinely long; `thead` is a header group, so a table that splits reprints
+its headings.
 
 Measured on a Chrome render of a seeded mid-August day — 4 items out, 10 rooms
-owing: one page. Growing the collection list to 20 rows moves the unpaid table
-over; at 12 rows it still shares. Chrome rather than weasyprint here, so this is
-the same engine the reception PC prints with.
+owing: one page. Twenty item rows moves the unpaid table over; twelve still
+shares.
 
-**The board gained a 3px gap around unpaid rooms.** A run of them was reading as
-one red block rather than four separate rooms; margins collapse, so neighbours
-share the gap.
+## Infrastructure
 
-`EXPECT_COLLECT_PAGES` in `ci/verify-print.py` drops back to 1 and now guards
-the opposite failure: if something starts padding these tables again, the
-seeded day grows a second page and the check fails.
+- **`ci/verify-print.py` renders more.** Both sheets a second time with month
+  names on, since that is the wider date format and the collection sheet's due
+  column is a fixed 3.6cm. The unpaid page is checked in both states — rooms
+  owing, and nothing owed — and `EXPECT_COLLECT_PAGES` guards against padding
+  creeping back and growing a second page.
+- **`ci/__pycache__` is untracked**, having been committed by accident with the
+  pipeline and rewritten on every run.
+
+## Still outstanding
+
+- **The Collections rework**, unchanged from the last session: `/inventory`
+  should become a grouped item list rather than redrawing the 59-room grid once
+  per per-room item.
+- **The unpaid list only covers current stays.** A guest who left owing money
+  does not appear. That matches "rooms that are currently unpaid" as asked for,
+  and keeps the list bounded, but it is not an accounts-receivable report.
+- **The PAT is still in plaintext** at `../claude-checklist.md` and has now been
+  used across two sessions. Rotate it.
+- Print layout is still tuned empirically. Chrome renders locally now, which is
+  a closer match than weasyprint, but the hotel's printer has the final say.

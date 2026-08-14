@@ -90,9 +90,21 @@ jobs:
         env:
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
+          # An annotated tag's message becomes the top of the notes. The
+          # boilerplate below covers installing and the fact that the data file
+          # survives a swap; anything true of *this* release only — a migration,
+          # or a change reception will notice on first run — belongs in the tag
+          # and would otherwise reach nobody who does not read CHANGES.md.
+          body=$(git tag -l --format='%(contents)' "$TAG")
           {
             echo "## Cleanlist $TAG"
             echo
+            if [ -n "$body" ]; then
+              echo "$body"
+              echo
+              echo "---"
+              echo
+            fi
             echo "### Installing"
             echo
             echo 'Download **`cleanlist.exe`** below and put it in a folder of its own on'
